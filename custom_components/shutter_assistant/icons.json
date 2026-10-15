@@ -1,0 +1,20 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "summer_day": { "default": "mdi:weather-sunny-alert", "state": { "off": "mdi:weather-sunny-off" } },
+      "evening_mode": { "default": "mdi:weather-night" },
+      "override": { "default": "mdi:hand-back-right-outline", "state": { "off": "mdi:hand-back-right-off-outline" } },
+      "sun_condition": { "default": "mdi:white-balance-sunny", "state": { "off": "mdi:weather-partly-cloudy" } },
+      "sun_protection_today": { "default": "mdi:roller-shade-closed", "state": { "off": "mdi:roller-shade" } },
+      "evening_closed": { "default": "mdi:window-shutter", "state": { "off": "mdi:window-shutter-open" } }
+    },
+    "sensor": {
+      "forecast_max": { "default": "mdi:thermometer-high" },
+      "status": { "default": "mdi:roller-shade" },
+      "last_reason": { "default": "mdi:message-text-clock-outline" }
+    },
+    "switch": {
+      "automatic": { "default": "mdi:roller-shade", "state": { "off": "mdi:roller-shade-closed" } }
+    }
+  }
+}
