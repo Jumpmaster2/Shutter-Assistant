@@ -145,6 +145,8 @@ from .messages import resolve_language, text
 type ShutterConfigEntry = ConfigEntry[ShutterEngine]
 
 INVALID = (STATE_UNAVAILABLE, STATE_UNKNOWN)
+# A failed forecast is retried after this time (the last known value stays valid).
+FORECAST_RETRY = timedelta(minutes=30)
 # CoverEntityFeature.SET_POSITION (not imported to keep the integration free of
 # platform dependencies)
 SET_POSITION = 4
@@ -210,6 +212,8 @@ class Window:
     last_manual: datetime | None = None
     last_reason: dict[str, Any] = field(default_factory=dict)
     morning_pending: bool = False
+    # evening run skipped because the automatic was off (caught up when switched on)
+    evening_missed: date | None = None
 
     @property
     def override_active(self) -> bool:
@@ -607,9 +611,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     @property
     def summer(self) -> bool:
         today = self._sun_day(dt_util.now())
-        forecast = self.forecast_max if self.forecast_day == today else None
+        # Without today's forecast the last known value counts (as before) until the
+        # retry succeeds.
         return summer_day(
-            forecast, float(self.opt(CONF_SUMMER_THRESHOLD)), self.raised_day == today
+            self.forecast_max, float(self.opt(CONF_SUMMER_THRESHOLD)), self.raised_day == today
         )
 
     def _evening_window(self, settings: EveningSettings, day: date) -> tuple[datetime, datetime]:
@@ -743,6 +748,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             startup=self._startup(now),
             position=self._position(win),
             window_open=win.window_open,
+            window_on=any(self._state_value(e) == STATE_ON for e in win.sensors),
             window_exception=self._window_exception(win),
             override=win.override_active,
             sun_marker=self.sun_marker(win, now),
@@ -1126,23 +1132,32 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     @callback
     def _on_trigger(self, event: Event[EventStateChangedData]) -> None:
         entity_id = event.data["entity_id"]
+        old = event.data["old_state"]
+        new = event.data["new_state"]
         now = dt_util.now()
         for win in self.windows.values():
             if entity_id not in (win.conf.get(CONF_TRIGGER_ENTITIES) or []):
                 continue
+            states = win.conf.get(CONF_TRIGGER_ACTIVE) or []
+            was_on = old is not None and old.state in states
+            is_on = new is not None and new.state in states
+            key = f"{win.window_id}:trigger_on:{entity_id}"
+            if is_on and not was_on:
+                # every device switching on gets its own attempt (once per cycle)
+                self._schedule(
+                    key,
+                    now + timedelta(seconds=float(win.conf[CONF_TRIGGER_ON_DELAY])),
+                    lambda now, wid=win.window_id, eid=entity_id: self._trigger_on(wid, eid, now),
+                )
+            elif not is_on:
+                self._cancel(key)
             active = self._trigger_active(win)
             if active == win.trigger.active:
                 continue
             win.trigger.active = active
             if active:
                 self._cancel(f"{win.window_id}:trigger_off")
-                self._schedule(
-                    f"{win.window_id}:trigger_on",
-                    now + timedelta(seconds=float(win.conf[CONF_TRIGGER_ON_DELAY])),
-                    lambda now, wid=win.window_id: self._trigger_on(wid, now),
-                )
             else:
-                self._cancel(f"{win.window_id}:trigger_on")
                 self._schedule(
                     f"{win.window_id}:trigger_off",
                     now + timedelta(seconds=float(win.conf[CONF_TRIGGER_OFF_DELAY])),
@@ -1153,9 +1168,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         return win.trigger.locked_until is not None and now < win.trigger.locked_until
 
     @callback
-    def _trigger_on(self, window_id: str, now: datetime) -> None:
+    def _trigger_on(self, window_id: str, entity_id: str, now: datetime) -> None:
         win = self.windows.get(window_id)
-        if win is None or not self._trigger_active(win) or self._trigger_locked(win, now):
+        if win is None or self._trigger_locked(win, now):
+            return
+        if self._state_value(entity_id) not in (win.conf.get(CONF_TRIGGER_ACTIVE) or []):
             return
         self._try_trigger_close(win, now)
 
@@ -1193,7 +1210,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         """Daily forecast: today's high decides about the summer day."""
         weather = self.opt(CONF_WEATHER)
         now = dt_util.now()
-        if weather and self._state(weather) is not None:
+        if not weather:
+            return
+        value = None
+        if self._state(weather) is not None:
             try:
                 response = await self.hass.services.async_call(
                     "weather",
@@ -1204,10 +1224,20 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 )
                 forecast = (response or {}).get(weather, {}).get("forecast") or []
                 if forecast:
-                    self.forecast_max = as_float(forecast[0].get("temperature"))
-                    self.forecast_day = self._sun_day(now)
+                    value = as_float(forecast[0].get("temperature"))
             except (HomeAssistantError, ValueError, AttributeError) as err:
                 LOGGER.warning("Forecast of %s not available: %s", weather, err)
+        if value is None:
+            LOGGER.info("No forecast from %s, keeping the last value and retrying", weather)
+            self._schedule(
+                "forecast_retry",
+                now + FORECAST_RETRY,
+                lambda _now: self.hass.async_create_task(self.async_update_forecast()),
+            )
+        else:
+            self.forecast_max = value
+            self.forecast_day = self._sun_day(now)
+            self._cancel("forecast_retry")
         self._save()
         self._evaluate_all(dt_util.now())
 
@@ -1266,9 +1296,18 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         win = self.windows.get(window_id)
         if win is None:
             return
-        self._apply(win, rules.evening(win.rules, self._situation(win, now)), now)
+        self._run_evening(win, now)
         self._schedule_window(win, now + timedelta(seconds=1))
         self.async_update_listeners()
+
+    def _run_evening(self, win: Window, now: datetime) -> None:
+        """Evening run; remembered if the automatic is off (as the old evening mode
+        only started with the automatic on)."""
+        if not self.automatic:
+            win.evening_missed = self._evening_day(now)
+            return
+        win.evening_missed = None
+        self._apply(win, rules.evening(win.rules, self._situation(win, now)), now)
 
     @callback
     def _startup_finished(self, now: datetime) -> None:
@@ -1279,8 +1318,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         )
         for win in self.windows.values():
             self._refresh(win, now)
-            if catch_up:
-                self._apply(win, rules.evening(win.rules, self._situation(win, now)), now)
+            if catch_up and self._evening(win, now):
+                self._run_evening(win, now)
             self._evaluate(win, now)
         self.async_update_listeners()
 
@@ -1468,7 +1507,13 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self.automatic = enabled
         self._save()
         if enabled:
-            self._evaluate_all(dt_util.now())
+            now = dt_util.now()
+            day = self._evening_day(now)
+            for win in self.windows.values():
+                if win.evening_missed == day and self._evening(win, now):
+                    self._run_evening(win, now)
+                win.evening_missed = None
+            self._evaluate_all(now)
         self.async_update_listeners()
 
     # ------------------------------------------------------------------ diagnostics

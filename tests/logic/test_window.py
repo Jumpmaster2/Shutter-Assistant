@@ -286,3 +286,10 @@ def test_status_order() -> None:
     assert w.status(RULES, Situation(sun_marker=True)) == w.S_SUN
     assert w.status(RULES, Situation(vacation=True)) == w.S_VACATION
     assert w.status(RULES, Situation()) == w.S_READY
+
+
+def test_no_notification_for_an_unavailable_contact() -> None:
+    # an unavailable contact blocks the movement but is not reported as open
+    s = replace(SUNNY, window_open=True, window_on=False)
+    assert w.sun(RULES, s) == []
+    assert kinds(w.sun(RULES, replace(s, window_on=True))) == [(w.NOTIFY, w.R_SUN_BLOCKED, None)]

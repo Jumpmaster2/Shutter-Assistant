@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.core import Context, CoreState, HomeAssistant
+from homeassistant.core import Context, CoreState, HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
 from custom_components.shutter_assistant.logic import sun as sunlib
@@ -510,3 +511,88 @@ async def test_morning_opening_by_brightness(
     assert calls["open_cover"] == []
     await advance(hass, freezer, 6 * 60)
     assert len(calls["open_cover"]) == 1
+
+
+async def test_forecast_failure_keeps_last_value_and_retries(
+    hass: HomeAssistant, base_states, calls, hass_storage, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to(SUMMER_NOON)
+    entry = make_entry(weather="weather.home")
+    hass_storage[f"shutter_assistant.{entry.entry_id}"] = {
+        "version": 1,
+        "key": f"shutter_assistant.{entry.entry_id}",
+        "data": {"forecast_day": "2026-06-30", "forecast_max": 26.0},
+    }
+    hass.states.async_set("weather.home", "sunny")
+    answer = {"fail": True}
+
+    async def get_forecasts(call: ServiceCall) -> dict:
+        if answer["fail"]:
+            raise HomeAssistantError("weather service down")
+        return {"weather.home": {"forecast": [{"temperature": 18.0}]}}
+
+    hass.services.async_register(
+        "weather", "get_forecasts", get_forecasts, supports_response=SupportsResponse.ONLY
+    )
+    await setup_entry(hass, entry)
+    # today's forecast failed: the last value (26 °C) still counts
+    assert hass.states.get(SUMMER).state == "on"
+    answer["fail"] = False
+    await advance(hass, freezer, 31 * 60)
+    assert hass.states.get(SUMMER).state == "off"
+    assert entry.runtime_data.forecast_day.isoformat() == "2026-07-01"
+
+
+async def test_no_push_for_an_unavailable_contact(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    hass.states.async_set(CONTACT, "unavailable")
+    await _summer_noon(hass, freezer)
+    await advance(hass, freezer, 15 * 60)
+    assert calls["set_cover_position"] == []
+    assert calls["notify"] == []
+
+
+async def test_evening_run_caught_up_when_automatic_switched_on(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-12-15 16:50:00+01:00")
+    await setup_entry(hass, make_entry())
+    switch = {"entity_id": "switch.shutter_assistant_automatic"}
+    await hass.services.async_call("switch", "turn_off", switch, blocking=True)
+    await advance(hass, freezer, 15 * 60)
+    assert calls["close_cover"] == []
+    await hass.services.async_call("switch", "turn_on", switch, blocking=True)
+    await hass.async_block_till_done()
+    assert len(calls["close_cover"]) == 1
+    # switching again does not repeat it
+    await hass.services.async_call("switch", "turn_off", switch, blocking=True)
+    await hass.services.async_call("switch", "turn_on", switch, blocking=True)
+    await hass.async_block_till_done()
+    assert len(calls["close_cover"]) == 1
+
+
+async def test_every_trigger_device_gets_an_attempt(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-10-15 12:00:00+02:00")
+    set_cover(hass, 0)
+    hass.states.async_set("media_player.fire_tv", "off")
+    await setup_entry(
+        hass,
+        make_entry(
+            window={
+                "close_trigger_entities": ["media_player.fire_tv", TV],
+                "close_trigger_active_states": ["idle", "paused", "playing"],
+            }
+        ),
+    )
+    hass.states.async_set("media_player.fire_tv", "playing")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 10, step=1)
+    assert calls["close_cover"] == []  # cover already closed, no cycle lock
+    set_cover(hass, 100)
+    hass.states.async_set(TV, "playing")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 10, step=1)
+    assert len(calls["close_cover"]) == 1

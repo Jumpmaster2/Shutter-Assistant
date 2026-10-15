@@ -84,7 +84,10 @@ class Situation:
     automatic: bool = True
     startup: bool = False
     position: int | None = None
+    # open or unknown contact: blocks closing movements
     window_open: bool = False
+    # a contact really reports "on" (None: same as window_open)
+    window_on: bool | None = None
     window_exception: bool = False
     override: bool = False
     sun_marker: bool = False
@@ -102,6 +105,11 @@ class Situation:
     def window_blocks(self) -> bool:
         """Open window that prevents closing movements (the exception entity lifts it)."""
         return self.window_open and not self.window_exception
+
+    @property
+    def window_reported_open(self) -> bool:
+        """A contact really reports open (an unavailable contact only blocks)."""
+        return self.window_open if self.window_on is None else self.window_on
 
     @property
     def active(self) -> bool:
@@ -132,7 +140,7 @@ def sun(rules: WindowRules, s: Situation) -> list[Action]:
             return [Action(MARK_SUN, R_SUN_ALREADY)]
         if not s.window_blocks:
             return [_move(rules.sun_position, R_SUN_LOWER), Action(MARK_SUN, R_SUN_LOWER)]
-        if rules.notify_open and not s.notified:
+        if rules.notify_open and not s.notified and s.window_reported_open:
             return [Action(NOTIFY, R_SUN_BLOCKED)]
         return []
     if (

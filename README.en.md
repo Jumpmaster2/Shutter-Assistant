@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.1.0.
+> Status: version 0.1.1.
 
 ## How it works
 
