@@ -1,0 +1,501 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Shutter Assistant",
+        "description": "Global sensors. Groups (sun directions) and windows are added afterwards.",
+        "data": {
+          "outdoor_temperature": "Outdoor temperature sensor",
+          "weather": "Weather entity",
+          "language": "Language of messages",
+          "notify_services": "Notification services",
+          "workday_entity": "Workday sensor"
+        },
+        "data_description": {
+          "outdoor_temperature": "Used for the summer day and the temperature condition of every window.",
+          "weather": "Its daily forecast decides at the day change whether today is a summer day.",
+          "language": "Logbook, last reason and push messages.",
+          "notify_services": "Get a message when an open window prevents the sun protection (e.g. notify.mobile_app_phone).",
+          "workday_entity": "Optional, for the morning opening by time (e.g. the Workday integration). Without it Monday to Friday are workdays."
+        }
+      },
+      "summer": {
+        "title": "Summer day",
+        "description": "Sun protection only runs on summer days.",
+        "data": {
+          "summer_threshold": "Summer day from forecast high",
+          "day_change_time": "Day change"
+        },
+        "data_description": {
+          "summer_threshold": "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value.",
+          "day_change_time": "Forecast check and reset of the daily sun protection markers and notifications."
+        }
+      },
+      "evening": {
+        "title": "Evening mode",
+        "description": "The evening mode closes the covers once and blocks auto up. Windows can use own times.",
+        "data": {
+          "evening_earliest": "Evening mode at the earliest",
+          "evening_elevation": "Sun elevation",
+          "evening_latest": "Evening mode at the latest",
+          "night_end": "End of the night",
+          "follow_up_earliest": "Close after window closed, from"
+        },
+        "data_description": {
+          "evening_earliest": "The evening mode never starts before this time.",
+          "evening_elevation": "The evening mode starts when the sun drops below this elevation (e.g. -4 °).",
+          "evening_latest": "Time fallback: the evening mode starts at this time at the latest.",
+          "night_end": "Evening mode and evening markers end at this time (or at sunrise if that is earlier).",
+          "follow_up_earliest": "A window closed in the evening closes the cover only after this time."
+        }
+      }
+    },
+    "error": {
+      "latest_before_earliest": "The latest time must not be before the earliest time.",
+      "night_end_after_evening": "The end of the night must be before the earliest evening time.",
+      "min_above_max": "Minimum must not be above maximum.",
+      "name_required": "Please enter a name.",
+      "azimuth_equal": "Azimuth from and to must differ.",
+      "no_lux_sensor": "The group of this window has no brightness sensor."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "menu_options": {
+          "general": "General",
+          "summer": "Summer day",
+          "evening": "Evening mode",
+          "vacation": "Vacation simulation",
+          "startup": "Restart protection"
+        }
+      },
+      "general": {
+        "title": "General",
+        "data": {
+          "outdoor_temperature": "Outdoor temperature sensor",
+          "weather": "Weather entity",
+          "language": "Language of messages",
+          "notify_services": "Notification services",
+          "workday_entity": "Workday sensor"
+        },
+        "data_description": {
+          "outdoor_temperature": "Used for the summer day and the temperature condition of every window.",
+          "weather": "Its daily forecast decides at the day change whether today is a summer day.",
+          "language": "Logbook, last reason and push messages.",
+          "notify_services": "Get a message when an open window prevents the sun protection (e.g. notify.mobile_app_phone).",
+          "workday_entity": "Optional, for the morning opening by time (e.g. the Workday integration). Without it Monday to Friday are workdays."
+        }
+      },
+      "summer": {
+        "title": "Summer day",
+        "description": "Sun protection only runs on summer days.",
+        "data": {
+          "summer_threshold": "Summer day from forecast high",
+          "day_change_time": "Day change"
+        },
+        "data_description": {
+          "summer_threshold": "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value.",
+          "day_change_time": "Forecast check and reset of the daily sun protection markers and notifications."
+        }
+      },
+      "evening": {
+        "title": "Evening mode",
+        "description": "The evening mode closes the covers once and blocks auto up. Windows can use own times.",
+        "data": {
+          "evening_earliest": "Evening mode at the earliest",
+          "evening_elevation": "Sun elevation",
+          "evening_latest": "Evening mode at the latest",
+          "night_end": "End of the night",
+          "follow_up_earliest": "Close after window closed, from"
+        },
+        "data_description": {
+          "evening_earliest": "The evening mode never starts before this time.",
+          "evening_elevation": "The evening mode starts when the sun drops below this elevation (e.g. -4 °).",
+          "evening_latest": "Time fallback: the evening mode starts at this time at the latest.",
+          "night_end": "Evening mode and evening markers end at this time (or at sunrise if that is earlier).",
+          "follow_up_earliest": "A window closed in the evening closes the cover only after this time."
+        }
+      },
+      "vacation": {
+        "title": "Vacation simulation",
+        "description": "Random opening in the morning and closing in the evening while vacation is active.",
+        "data": {
+          "vacation_entities": "Vacation entities",
+          "vacation_morning_start": "Vacation morning from",
+          "vacation_morning_window": "Random period in the morning",
+          "vacation_position_min": "Opening position from",
+          "vacation_position_max": "Opening position to",
+          "vacation_evening_start": "Vacation evening from",
+          "vacation_evening_window": "Random period in the evening"
+        },
+        "data_description": {
+          "vacation_entities": "Vacation is active while one of them is on (e.g. the same helper as for the heating).",
+          "vacation_morning_start": "Closed covers of the windows in the simulation open at a random time after this.",
+          "vacation_morning_window": "Each window opens at a random time within this period.",
+          "vacation_position_min": "Random position between both values.",
+          "vacation_position_max": "Random position between both values.",
+          "vacation_evening_start": "Starts the evening for the windows in the simulation and closes them at random times. The normal evening run rests during vacation.",
+          "vacation_evening_window": "Each window closes at a random time within this period."
+        }
+      },
+      "startup": {
+        "title": "Restart protection",
+        "data": {
+          "startup_delay": "Restart protection",
+          "catch_up_after": "Catch up the evening run from"
+        },
+        "data_description": {
+          "startup_delay": "No movement for this time after Home Assistant started (sensors and covers are still coming online).",
+          "catch_up_after": "After the restart protection the evening run is caught up for windows not yet closed this evening, but only after this time."
+        }
+      }
+    },
+    "error": {
+      "latest_before_earliest": "The latest time must not be before the earliest time.",
+      "night_end_after_evening": "The end of the night must be before the earliest evening time.",
+      "min_above_max": "Minimum must not be above maximum.",
+      "name_required": "Please enter a name.",
+      "azimuth_equal": "Azimuth from and to must differ.",
+      "no_lux_sensor": "The group of this window has no brightness sensor."
+    }
+  },
+  "config_subentries": {
+    "group": {
+      "entry_type": "Group",
+      "initiate_flow": {
+        "user": "Add group",
+        "reconfigure": "Change group"
+      },
+      "step": {
+        "user": {
+          "title": "Group",
+          "description": "A group is a direction of the sun with its sensors. Thresholds are set per window.",
+          "data": {
+            "name": "Name",
+            "azimuth_from": "Azimuth from",
+            "azimuth_to": "Azimuth to",
+            "radiation_sensors": "Radiation sensors",
+            "pv_sensors": "PV power sensors",
+            "lux_sensors": "Brightness sensors"
+          },
+          "data_description": {
+            "name": "Also used for the device and its entities.",
+            "azimuth_from": "Sun direction from which the sun shines on the windows (90 ° = east, 180 ° = south, 270 ° = west). The bounds themselves do not count.",
+            "azimuth_to": "When the sun reaches this direction, protected covers open again (auto up).",
+            "radiation_sensors": "e.g. direct radiation from Open-Meteo (W/m²).",
+            "pv_sensors": "e.g. the input of a balcony power plant facing this direction (W).",
+            "lux_sensors": "Lux sensors at the windows. Every sensor of the group must reach the threshold of the window."
+          }
+        },
+        "reconfigure": {
+          "title": "Group",
+          "description": "A group is a direction of the sun with its sensors. Thresholds are set per window.",
+          "data": {
+            "name": "Name",
+            "azimuth_from": "Azimuth from",
+            "azimuth_to": "Azimuth to",
+            "radiation_sensors": "Radiation sensors",
+            "pv_sensors": "PV power sensors",
+            "lux_sensors": "Brightness sensors"
+          },
+          "data_description": {
+            "name": "Also used for the device and its entities.",
+            "azimuth_from": "Sun direction from which the sun shines on the windows (90 ° = east, 180 ° = south, 270 ° = west). The bounds themselves do not count.",
+            "azimuth_to": "When the sun reaches this direction, protected covers open again (auto up).",
+            "radiation_sensors": "e.g. direct radiation from Open-Meteo (W/m²).",
+            "pv_sensors": "e.g. the input of a balcony power plant facing this direction (W).",
+            "lux_sensors": "Lux sensors at the windows. Every sensor of the group must reach the threshold of the window."
+          }
+        }
+      },
+      "error": {
+        "latest_before_earliest": "The latest time must not be before the earliest time.",
+        "night_end_after_evening": "The end of the night must be before the earliest evening time.",
+        "min_above_max": "Minimum must not be above maximum.",
+        "name_required": "Please enter a name.",
+        "azimuth_equal": "Azimuth from and to must differ.",
+        "no_lux_sensor": "The group of this window has no brightness sensor."
+      },
+      "abort": {
+        "reconfigure_successful": "Changes saved."
+      }
+    },
+    "window": {
+      "entry_type": "Window",
+      "initiate_flow": {
+        "user": "Add window",
+        "reconfigure": "Change window"
+      },
+      "step": {
+        "basics": {
+          "title": "Window",
+          "data": {
+            "name": "Name",
+            "cover": "Cover",
+            "window_sensors": "Window contacts",
+            "group": "Group"
+          },
+          "data_description": {
+            "name": "Also used for the device and its entities.",
+            "cover": "100 % = open, 0 % = closed.",
+            "window_sensors": "'on' = open. Unknown or unavailable counts as open.",
+            "group": "Direction of the sun. Without a group the window has no sun protection."
+          }
+        },
+        "sun": {
+          "title": "Sun protection",
+          "description": "Thresholds for the group {group}.",
+          "data": {
+            "radiation_threshold": "Radiation threshold",
+            "pv_threshold": "PV threshold",
+            "lux_threshold": "Brightness threshold",
+            "temperature_threshold": "Outdoor temperature at least",
+            "temperature_hold": "Temperature hold time",
+            "sun_hold": "Sun hold time",
+            "sun_position": "Sun protection position",
+            "position_tolerance": "Tolerance for auto up",
+            "auto_up": "Auto up",
+            "notify_open_window": "Notify about an open window",
+            "manual_max_position": "Manual sun protection up to",
+            "manual_detection_window": "Detection period",
+            "manual_follow_up": "Follow-up of the sun condition",
+            "manual_at_sun_position": "Moving onto the sun protection position counts"
+          },
+          "data_description": {
+            "radiation_threshold": "Every radiation sensor of the group must reach this value.",
+            "pv_threshold": "Every PV sensor of the group must reach this value.",
+            "lux_threshold": "Every brightness sensor of the group must reach this value.",
+            "temperature_threshold": "Sun protection only from this outdoor temperature on.",
+            "temperature_hold": "The outdoor temperature must stay above the value this long. Below it the condition ends immediately.",
+            "sun_hold": "Summer day, temperature and all sun sensors must be fulfilled this long. The condition ends immediately.",
+            "sun_position": "Lowered once a day to this position. A cover already further closed is left alone.",
+            "position_tolerance": "Auto up only opens covers standing at the sun protection position up to this much above it. Covers moved elsewhere by hand stay.",
+            "auto_up": "Open again when the sun leaves the sector (not in the evening).",
+            "notify_open_window": "Once a day, if an open window prevented the sun protection.",
+            "manual_max_position": "A cover lowered by hand to at most this position while the sun shines counts as sun protection for today (no automatic movement).",
+            "manual_detection_window": "The manual movement must not be longer ago than this.",
+            "manual_follow_up": "For this detection the sun condition (without temperature) still counts this long after it ended.",
+            "manual_at_sun_position": "A cover moved by anyone onto the sun protection position (up to the tolerance) while the sun shines is treated like automatic sun protection and opens again with auto up."
+          }
+        },
+        "behavior": {
+          "title": "Behaviour",
+          "sections": {
+            "override": {
+              "name": "Manual override",
+              "data": {
+                "override_duration": "Duration",
+                "override_sunrise_reset": "Also end at sunrise",
+                "override_ignore_evening": "Evening and vacation runs despite override"
+              },
+              "data_description": {
+                "override_duration": "After a manual movement the automatic pauses this long for the window. Every further movement starts it again. 0 = until sunrise.",
+                "override_ignore_evening": "e.g. bedrooms that should always close in the evening."
+              }
+            },
+            "conditions": {
+              "name": "Additional conditions",
+              "data": {
+                "open_block_entity": "Opening block",
+                "open_block_free_states": "Free states",
+                "close_trigger_entities": "Close trigger",
+                "close_trigger_active_states": "Active states",
+                "close_trigger_on_delay": "Active after",
+                "close_trigger_off_delay": "Inactive after",
+                "close_trigger_min_position": "Only if open more than",
+                "close_trigger_max_lock": "Cycle at most",
+                "window_exception_entity": "Window exception"
+              },
+              "data_description": {
+                "open_block_entity": "No automatic opening (auto up, ventilation, vacation morning, morning opening) unless this entity has one of the free states (e.g. a TV).",
+                "close_trigger_entities": "When one of these entities becomes active, the cover closes once per active cycle, only with a closed window (otherwise as soon as it is closed). The cycle ends when all are inactive.",
+                "window_exception_entity": "While this entity is available, an open window does not prevent closing movements and no message is sent (e.g. an air conditioner with its hose through the balcony door). Not used for the vacation evening."
+              }
+            },
+            "evening": {
+              "name": "Evening",
+              "data": {
+                "evening_close": "Evening run",
+                "follow_up_close": "Close after window closed",
+                "evening_custom": "Own evening times",
+                "evening_earliest": "Evening mode at the earliest",
+                "evening_elevation": "Sun elevation",
+                "evening_latest": "Evening mode at the latest"
+              },
+              "data_description": {
+                "evening_close": "Close at the start of the evening mode, once per evening and only with a closed window.",
+                "follow_up_close": "If the window is closed in the evening, the cover closes (also during an override).",
+                "evening_custom": "Use the following values instead of the global ones.",
+                "evening_earliest": "The evening mode never starts before this time.",
+                "evening_elevation": "The evening mode starts when the sun drops below this elevation (e.g. -4 °).",
+                "evening_latest": "Time fallback: the evening mode starts at this time at the latest."
+              }
+            },
+            "ventilation_settings": {
+              "name": "Ventilation and vacation",
+              "data": {
+                "ventilation": "Ventilate when the window opens",
+                "ventilation_position": "Ventilation position",
+                "closed_position": "Counts as closed up to",
+                "ventilation_delay_evening": "Delay in the evening",
+                "ventilation_delay_day": "Delay during the day",
+                "vacation": "Vacation simulation"
+              },
+              "data_description": {
+                "ventilation": "Opening the window moves a closed cover to the ventilation position (in the evening after the short delay, during the day after the long one).",
+                "closed_position": "Used for ventilation and the vacation morning.",
+                "ventilation_delay_day": "The window must still be open afterwards.",
+                "vacation": "Take part in the random opening and closing during vacation."
+              }
+            }
+          }
+        },
+        "morning": {
+          "title": "Morning opening",
+          "description": "Never with an active override, an opening block or a cover moved by hand since the evening. During vacation the simulation opens instead.",
+          "data": {
+            "morning_enabled": "Morning opening",
+            "morning_mode": "Mode",
+            "morning_earliest": "At the earliest",
+            "morning_latest": "At the latest",
+            "morning_position": "Target position",
+            "morning_sun_position": "Directly to sun protection if needed"
+          },
+          "data_description": {
+            "morning_latest": "If nothing triggered until then, the cover opens at this time.",
+            "morning_position": "100 = open, less = partial opening.",
+            "morning_sun_position": "If the sun condition applies, open only to the sun protection position."
+          }
+        },
+        "morning_time": {
+          "title": "Morning opening by time",
+          "data": {
+            "morning_time_workday": "Workdays",
+            "morning_time_weekend": "Weekend and holidays"
+          }
+        },
+        "morning_sun": {
+          "title": "Morning opening by sun",
+          "data": {
+            "morning_sun_event": "Event",
+            "morning_sun_elevation": "Sun elevation",
+            "morning_sun_offset": "Offset"
+          },
+          "data_description": {
+            "morning_sun_elevation": "Only for sun elevation: opens when the rising sun passes this elevation."
+          }
+        },
+        "morning_brightness": {
+          "title": "Morning opening by brightness",
+          "data": {
+            "morning_lux_threshold": "Brightness",
+            "morning_lux_hold": "Hold time"
+          },
+          "data_description": {
+            "morning_lux_threshold": "Every brightness sensor of the group must reach this value."
+          }
+        },
+        "morning_trigger": {
+          "title": "Morning opening by trigger",
+          "data": {
+            "morning_trigger_entity": "Trigger entity",
+            "morning_trigger_offset": "Offset"
+          },
+          "data_description": {
+            "morning_trigger_entity": "A timestamp (e.g. the next alarm of a phone) opens at that time plus offset. Any other entity opens when it turns on (motion, switch).",
+            "morning_trigger_offset": "Only for timestamps."
+          }
+        }
+      },
+      "error": {
+        "latest_before_earliest": "The latest time must not be before the earliest time.",
+        "night_end_after_evening": "The end of the night must be before the earliest evening time.",
+        "min_above_max": "Minimum must not be above maximum.",
+        "name_required": "Please enter a name.",
+        "azimuth_equal": "Azimuth from and to must differ.",
+        "no_lux_sensor": "The group of this window has no brightness sensor."
+      },
+      "abort": {
+        "reconfigure_successful": "Changes saved."
+      }
+    }
+  },
+  "selector": {
+    "language": {
+      "options": {
+        "auto": "Like Home Assistant",
+        "de": "Deutsch",
+        "en": "English"
+      }
+    },
+    "morning_mode": {
+      "options": {
+        "time": "Fixed time (workday / weekend)",
+        "sun": "Sun (sunrise or elevation)",
+        "brightness": "Brightness of the group",
+        "trigger": "Trigger entity (alarm, motion, switch)"
+      }
+    },
+    "morning_sun_event": {
+      "options": {
+        "sunrise": "Sunrise",
+        "elevation": "Sun elevation"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "summer_day": {
+        "name": "Summer day"
+      },
+      "evening_mode": {
+        "name": "Evening mode"
+      },
+      "override": {
+        "name": "Manual override"
+      },
+      "sun_condition": {
+        "name": "Sun condition"
+      },
+      "sun_protection_today": {
+        "name": "Sun protection today"
+      },
+      "evening_closed": {
+        "name": "Closed this evening"
+      }
+    },
+    "sensor": {
+      "forecast_max": {
+        "name": "Forecast high"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "off": "Automatic off",
+          "startup": "Restart protection",
+          "override": "Manual override",
+          "evening": "Closed for the evening",
+          "sun_protection": "Sun protection",
+          "vacation": "Vacation simulation",
+          "ready": "Ready"
+        }
+      },
+      "last_reason": {
+        "name": "Last reason"
+      }
+    },
+    "switch": {
+      "automatic": {
+        "name": "Automatic"
+      }
+    }
+  },
+  "issues": {
+    "missing_group": {
+      "title": "Group of a window is missing",
+      "description": "The window {window} refers to a deleted group and has no sun protection. Choose a group in the settings of the window."
+    }
+  }
+}
