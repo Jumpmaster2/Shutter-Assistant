@@ -14,6 +14,7 @@ from custom_components.shutter_assistant.logic import sun as sunlib
 
 from .conftest import (
     CONTACT,
+    COVER,
     OUTDOOR,
     PV,
     SUMMER_NOON,
@@ -596,3 +597,25 @@ async def test_every_trigger_device_gets_an_attempt(
     await hass.async_block_till_done()
     await advance(hass, freezer, 10, step=1)
     assert len(calls["close_cover"]) == 1
+
+
+async def test_control_attributes(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    await _summer_noon(hass, freezer)
+    await advance(hass, freezer, 60)
+    attrs = hass.states.get("binary_sensor.living_room_sun_condition").attributes
+    assert attrs["summer_day"] is True
+    assert attrs["temperature_sensor"] == OUTDOOR
+    assert attrs["temperature_threshold"] == 19.0
+    assert attrs["temperature_ok"] is False
+    assert attrs["temperature_ok_at"].startswith("2026-07-01T12:10")
+    assert attrs["sensors"]["pv"] == {"entities": [PV], "threshold": 130.0}
+    assert attrs["sensors"]["radiation"]["threshold"] == 150.0
+    assert (attrs["azimuth_from"], attrs["azimuth_to"]) == (90.0, 270.0)
+    assert attrs["sun_position"] == 10
+    status = hass.states.get(STATUS).attributes
+    assert status["cover"] == COVER
+    assert status["window_open"] is False
+    assert status["evening_start"].startswith("2026-07-01T21:00")
+    assert status["override_until"] is None

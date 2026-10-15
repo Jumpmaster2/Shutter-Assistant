@@ -98,13 +98,7 @@ class SunCondition(WindowEntity, BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        engine, win = self.coordinator, self.window
-        return {
-            "summer_day": engine.summer,
-            "temperature_ok": engine.temp_ok(win),
-            "sensors_ok": engine.sensors_ok(win),
-            "in_sector": engine.in_sector(win),
-        }
+        return self.coordinator.sun_details(self.window)
 
 
 class SunProtectionToday(WindowEntity, BinarySensorEntity):

@@ -6,7 +6,7 @@ Custom Integration für Home Assistant, die Rollos und Raffstores automatisch st
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.1.2.
+> Status: Version 0.1.3.
 
 ## Funktionsweise
 
@@ -116,6 +116,8 @@ Je Fenster (eigenes Gerät):
 * Sensor **Status** (Automatik aus, Neustart-Schutz, Manuelle Übersteuerung, Abends geschlossen, Sonnenschutz, Urlaubssimulation, Bereit)
 * Sensor **Letzter Grund** (Text, Code, Position, Zeit)
 * Binärsensoren **Manuelle Übersteuerung** (mit Ende), **Sonnenbedingung** (mit Teilbedingungen), **Sonnenschutz heute**, **Abends geschlossen**
+
+Für Kontroll-Karten im Dashboard liefern **Sonnenbedingung** (Schwellen, Sensoren, Azimut-Bereich, Haltezeiten und wann sie ablaufen) und **Status** (Rollo, Fensterkontakte, Abendbeginn, Übersteuerung bis) alle Werte als Attribute.
 
 Jede Fahrt und jede Übersteuerung steht mit Grund im **Logbuch**.
 

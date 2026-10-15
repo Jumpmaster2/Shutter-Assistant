@@ -766,6 +766,58 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     def status(self, win: Window) -> str:
         return rules.status(win.rules, self._situation(win, dt_util.now()))
 
+    def sun_details(self, win: Window) -> dict[str, Any]:
+        """Thresholds, sensors and pending hold times of the sun condition (read only)."""
+        ts = dt_util.utcnow().timestamp()
+
+        def at(due: float | None) -> str | None:
+            return dt_util.as_local(dt_util.utc_from_timestamp(due)).isoformat() if due else None
+
+        details: dict[str, Any] = {
+            "summer_day": self.summer,
+            "forecast_max": self.forecast_max,
+            "summer_threshold": float(self.opt(CONF_SUMMER_THRESHOLD)),
+            "temperature_sensor": self.opt(CONF_OUTDOOR_TEMP),
+            "temperature_threshold": float(win.conf[CONF_TEMP_THRESHOLD]),
+            "temperature_hold": float(win.conf[CONF_TEMP_HOLD]),
+            "temperature_ok": self.temp_ok(win),
+            "temperature_ok_at": at(win.temp_hold.due(ts)),
+            "sensors_ok": self.sensors_ok(win),
+            "sun_hold": float(win.conf[CONF_SUN_HOLD]),
+            "condition_on_at": at(win.live_hold.due(ts)),
+            "in_sector": self.in_sector(win),
+            "sun_position": win.rules.sun_position,
+            "position_tolerance": win.rules.tolerance,
+            "auto_up": win.rules.auto_up,
+        }
+        if (group := self.groups.get(win.group_id or "")) is not None:
+            details["group"] = group.name
+            details["azimuth_from"] = group.azimuth_from
+            details["azimuth_to"] = group.azimuth_to
+            details["sensors"] = {
+                kind: {"entities": entities, "threshold": float(win.conf[THRESHOLD_KEYS[kind]])}
+                for kind, entities in group.sensors.items()
+                if entities
+            }
+        return details
+
+    def window_details(self, win: Window) -> dict[str, Any]:
+        """Cover, contacts, evening and override of a window (read only)."""
+        now = dt_util.now()
+        settings = win.evening_settings or self.global_evening
+        start, end = self._evening_window(settings, self._evening_day(now))
+        return {
+            "cover": win.cover,
+            "window_sensors": win.sensors,
+            "window_open": win.window_open,
+            "evening": self._evening(win, now),
+            "evening_start": start.isoformat(),
+            "evening_end": end.isoformat(),
+            "override_until": _iso(win.override_until) if win.override_active else None,
+            "open_block_entity": win.conf.get(CONF_OPEN_BLOCK),
+            "open_blocked": self._open_blocked(win),
+        }
+
     # ------------------------------------------------------------------ actions
 
     def _apply(self, win: Window, actions: list[rules.Action], now: datetime) -> None:

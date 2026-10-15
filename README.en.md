@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.1.2.
+> Status: version 0.1.3.
 
 ## How it works
 
@@ -116,6 +116,8 @@ Per window (own device):
 * Sensor **Status** (automatic off, restart protection, manual override, closed for the evening, sun protection, vacation simulation, ready)
 * Sensor **Last reason** (text, code, position, time)
 * Binary sensors **Manual override** (with end), **Sun condition** (with partial conditions), **Sun protection today**, **Closed this evening**
+
+For control cards on a dashboard, **Sun condition** (thresholds, sensors, azimuth sector, hold times and when they end) and **Status** (cover, window contacts, evening start, override end) provide all values as attributes.
 
 Every movement and every override is written to the **logbook** with its reason.
 

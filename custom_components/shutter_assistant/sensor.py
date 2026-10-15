@@ -57,6 +57,10 @@ class Status(WindowEntity, SensorEntity):
     def native_value(self) -> str:
         return self.coordinator.status(self.window)
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return self.coordinator.window_details(self.window)
+
 
 class LastReason(WindowEntity, SensorEntity):
     """The last movement or decision and why."""
