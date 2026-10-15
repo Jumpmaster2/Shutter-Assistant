@@ -407,6 +407,16 @@
             "morning_trigger_entity": "A timestamp (e.g. the next alarm of a phone) opens at that time plus offset. Any other entity opens when it turns on (motion, switch).",
             "morning_trigger_offset": "Only for timestamps."
           }
+        },
+        "reconfigure": {
+          "title": "Change window",
+          "description": "What do you want to change? Each category is saved on its own.",
+          "menu_options": {
+            "basics": "Window: name, cover, contacts, group",
+            "sun": "Sun protection: thresholds, hold times, position, auto up",
+            "behavior": "Behaviour: override, additional conditions, evening, ventilation, vacation",
+            "morning": "Morning opening"
+          }
         }
       },
       "error": {

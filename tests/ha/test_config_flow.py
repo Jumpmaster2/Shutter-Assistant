@@ -211,17 +211,56 @@ async def test_window_without_group_skips_sun(hass: HomeAssistant, base_states) 
     assert result["step_id"] == "behavior"
 
 
-async def test_window_reconfigure_keeps_values(hass: HomeAssistant, base_states) -> None:
+async def test_window_reconfigure_menu_saves_one_category(hass: HomeAssistant, base_states) -> None:
     entry = make_entry(window={"sun_position": 15, "override_ignore_evening": True})
     await setup_entry(hass, entry)
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, SUBENTRY_WINDOW),
         context={"source": SOURCE_RECONFIGURE, "subentry_id": WINDOW_ID},
     )
-    assert result["step_id"] == "basics"
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["basics", "sun", "behavior", "morning"]
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {"name": "Living room", "cover": COVER, "group": GROUP_ID}
+        result["flow_id"], {"next_step_id": "sun"}
     )
     assert result["step_id"] == "sun"
-    defaults = {str(k): k.default() for k in result["data_schema"].schema if callable(k.default)}
-    assert defaults["sun_position"] == 15
+    assert result["last_step"] is True
+    values = {str(k): k.default() for k in result["data_schema"].schema if callable(k.default)}
+    assert values["sun_position"] == 15
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {**values, "sun_position": 25}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    data = entry.subentries[WINDOW_ID].data
+    assert data["sun_position"] == 25
+    # everything else is kept
+    assert data["override_ignore_evening"] is True
+    assert data["cover"] == COVER
+
+
+async def test_window_reconfigure_basics_only(hass: HomeAssistant, base_states) -> None:
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_WINDOW),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": WINDOW_ID},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"next_step_id": "basics"}
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"name": "Lounge", "cover": COVER, "group": GROUP_ID}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert entry.subentries[WINDOW_ID].title == "Lounge"
+    assert entry.subentries[WINDOW_ID].data["sun_position"] == 10
+
+
+async def test_window_creation_steps_say_next(hass: HomeAssistant, base_states) -> None:
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_WINDOW), context={"source": SOURCE_USER}
+    )
+    assert result["last_step"] is False

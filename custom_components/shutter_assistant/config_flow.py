@@ -535,10 +535,15 @@ class WindowSubentryFlow(ConfigSubentryFlow):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        """Change a window: choose a category, each one is saved on its own."""
         subentry = self._get_reconfigure_subentry()
         self._reconfigure = True
         self._values = {CONF_NAME: subentry.title, **subentry.data}
-        return await self.async_step_basics()
+        options = ["basics"]
+        if self._values.get(CONF_GROUP) in self._groups():
+            options.append("sun")
+        options += ["behavior", "morning"]
+        return self.async_show_menu(step_id="reconfigure", menu_options=options)
 
     # ---- steps
 
@@ -554,9 +559,13 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 for key in (CONF_GROUP,):
                     self._values.pop(key, None)
                 self._values.update({**user_input, CONF_NAME: name})
-                if self._values.get(CONF_GROUP) in self._groups():
+                has_group = self._values.get(CONF_GROUP) in self._groups()
+                if not has_group:
+                    self._values.pop(CONF_GROUP, None)
+                if self._reconfigure:
+                    return self._finish()
+                if has_group:
                     return await self.async_step_sun()
-                self._values.pop(CONF_GROUP, None)
                 return await self.async_step_behavior()
         groups = [
             SelectOptionDict(value=sub_id, label=sub.title)
@@ -573,11 +582,18 @@ class WindowSubentryFlow(ConfigSubentryFlow):
             schema[_opt(CONF_GROUP, self._values)] = SelectSelector(
                 SelectSelectorConfig(options=groups, mode=SelectSelectorMode.DROPDOWN)
             )
-        return self.async_show_form(step_id="basics", data_schema=vol.Schema(schema), errors=errors)
+        return self.async_show_form(
+            step_id="basics",
+            data_schema=vol.Schema(schema),
+            errors=errors,
+            last_step=self._reconfigure,
+        )
 
     async def async_step_sun(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         if user_input is not None:
             self._values.update(user_input)
+            if self._reconfigure:
+                return self._finish()
             return await self.async_step_behavior()
         group = self._groups().get(self._values.get(CONF_GROUP, ""))
         group_data = {**GROUP_DEFAULTS, **(group.data if group else {})}
@@ -606,6 +622,7 @@ class WindowSubentryFlow(ConfigSubentryFlow):
             step_id="sun",
             data_schema=vol.Schema(fields),
             description_placeholders={"group": group.title if group else ""},
+            last_step=self._reconfigure,
         )
 
     async def async_step_behavior(
@@ -621,6 +638,8 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 for key in (CONF_OPEN_BLOCK, CONF_WINDOW_EXCEPTION):
                     self._values.pop(key, None)
                 self._values.update(flat)
+                if self._reconfigure:
+                    return self._finish()
                 return await self.async_step_morning()
             self._values.update(flat)
         v = self._values
@@ -686,7 +705,9 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 ),
             }
         )
-        return self.async_show_form(step_id="behavior", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="behavior", data_schema=schema, errors=errors, last_step=self._reconfigure
+        )
 
     async def async_step_morning(
         self, user_input: dict[str, Any] | None = None
@@ -734,7 +755,7 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 self._req(CONF_MORNING_WEEKEND): TimeSelector(),
             }
         )
-        return self.async_show_form(step_id="morning_time", data_schema=schema)
+        return self.async_show_form(step_id="morning_time", data_schema=schema, last_step=True)
 
     async def async_step_morning_sun(
         self, user_input: dict[str, Any] | None = None
@@ -751,7 +772,7 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 self._req(CONF_MORNING_SUN_OFFSET): _number(-180, 180, 1, "min"),
             }
         )
-        return self.async_show_form(step_id="morning_sun", data_schema=schema)
+        return self.async_show_form(step_id="morning_sun", data_schema=schema, last_step=True)
 
     async def async_step_morning_brightness(
         self, user_input: dict[str, Any] | None = None
@@ -765,7 +786,9 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 self._req(CONF_MORNING_LUX_HOLD): _number(0, 120, 1, "min"),
             }
         )
-        return self.async_show_form(step_id="morning_brightness", data_schema=schema)
+        return self.async_show_form(
+            step_id="morning_brightness", data_schema=schema, last_step=True
+        )
 
     async def async_step_morning_trigger(
         self, user_input: dict[str, Any] | None = None
@@ -781,4 +804,4 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 self._req(CONF_MORNING_TRIGGER_OFFSET): _number(-180, 180, 1, "min"),
             }
         )
-        return self.async_show_form(step_id="morning_trigger", data_schema=schema)
+        return self.async_show_form(step_id="morning_trigger", data_schema=schema, last_step=True)

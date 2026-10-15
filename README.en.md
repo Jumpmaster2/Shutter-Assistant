@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.1.1.
+> Status: version 0.1.2.
 
 ## How it works
 
@@ -100,6 +100,8 @@ Requires Home Assistant 2026.10 or newer.
 4. **Morning opening:** on or off, mode and period, then the settings of the mode.
 
 Positions: 100 % = open, 0 % = closed.
+
+**Changing:** gear icon of the window, then choose the category (window, sun protection, behaviour, morning opening). Each category is saved on its own, the others stay unchanged.
 
 ## Entities
 

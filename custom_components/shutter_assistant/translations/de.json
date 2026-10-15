@@ -407,6 +407,16 @@
             "morning_trigger_entity": "Ein Zeitstempel (z. B. nächster Wecker des Handys) öffnet zu dieser Zeit plus Versatz. Jede andere Entität öffnet, wenn sie angeht (Bewegung, Schalter).",
             "morning_trigger_offset": "Nur für Zeitstempel."
           }
+        },
+        "reconfigure": {
+          "title": "Fenster ändern",
+          "description": "Was möchtest du ändern? Jede Kategorie wird für sich gespeichert.",
+          "menu_options": {
+            "basics": "Fenster: Name, Rollo, Fensterkontakte, Gruppe",
+            "sun": "Sonnenschutz: Schwellen, Haltezeiten, Position, Auto-Hoch",
+            "behavior": "Verhalten: Übersteuerung, Zusatzbedingungen, Abend, Lüften, Urlaub",
+            "morning": "Morgenöffnung"
+          }
         }
       },
       "error": {

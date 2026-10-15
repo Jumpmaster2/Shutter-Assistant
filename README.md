@@ -6,7 +6,7 @@ Custom Integration für Home Assistant, die Rollos und Raffstores automatisch st
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.1.1.
+> Status: Version 0.1.2.
 
 ## Funktionsweise
 
@@ -100,6 +100,8 @@ Voraussetzung: Home Assistant 2026.10 oder neuer.
 4. **Morgenöffnung:** an oder aus, Modus und Zeitfenster, danach die Einstellungen des Modus.
 
 Positionen: 100 % = offen, 0 % = zu.
+
+**Ändern:** Zahnrad beim Fenster, dann die Kategorie wählen (Fenster, Sonnenschutz, Verhalten, Morgenöffnung). Jede Kategorie wird für sich gespeichert, die anderen bleiben unverändert.
 
 ## Entitäten
 
