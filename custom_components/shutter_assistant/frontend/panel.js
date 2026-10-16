@@ -35,7 +35,9 @@ const UI = {
       house_azimuth: ["Vorderseite zeigt nach", "Himmelsrichtung, in die die Vorderseite schaut (90° = Ost, 180° = Süd, 270° = West), z. B. auf einer Karte abgelesen."],
       house_width: ["Länge der Vorderseite", "Gilt auch für die Rückseite."],
       house_depth: ["Tiefe", "Länge der beiden Seitenwände."],
+      wall_position: ["Position an der Wand", "1 = ganz links, von innen durch die Wand nach draußen geschaut. Bestimmt die Reihenfolge im Kompass, Fenster ohne Zahl kommen danach."],
     },
+    wallOthers: (list) => `An dieser Wand: ${list}`,
     wall: "Wand",
     wallHelpGroup: "Setzt den Azimut-Bereich auf die Ausrichtung der Wand ± 90° (danach frei änderbar). Die Wand wird im Kompass in der Farbe der Gruppe gezeigt.",
     wallHelpWindow: "Das Fenster erscheint an dieser Wand im Kompass. Ohne Angabe gilt die Wand der Gruppe.",
@@ -169,7 +171,9 @@ const UI = {
       house_azimuth: ["Front faces", "Direction the front looks to (90° = east, 180° = south, 270° = west), e.g. read from a map."],
       house_width: ["Length of the front", "Also the back."],
       house_depth: ["Depth", "Length of the two side walls."],
+      wall_position: ["Position on the wall", "1 = far left, looking out through the wall from inside. Sets the order in the compass, windows without a number come after."],
     },
+    wallOthers: (list) => `On this wall: ${list}`,
     wall: "Wall",
     wallHelpGroup: "Sets the azimuth sector to the direction of the wall ± 90° (can be changed afterwards). The wall is shown in the compass in the colour of the group.",
     wallHelpWindow: "The window appears at this wall in the compass. Without a wall the wall of the group is used.",
@@ -316,7 +320,7 @@ const MORNING_MODE_FIELDS = {
 
 // Window editor: cards with the fields that apply for the current values
 const WINDOW_CARDS = [
-  { id: "w_basics", icon: "mdi:window-shutter-cog", fields: () => ["name", "cover", "window_sensors", "group", "wall"] },
+  { id: "w_basics", icon: "mdi:window-shutter-cog", fields: () => ["name", "cover", "window_sensors", "group", "wall", "wall_position"] },
   {
     id: "w_sun",
     icon: "mdi:sun-angle-outline",
@@ -523,6 +527,23 @@ class ShutterAssistantPanel extends HTMLElement {
     return win.data.wall || this._group(win.data.group)?.data?.wall || null;
   }
 
+  // windows on a wall in their order: numbered first (1 = left seen from inside), then the rest
+  _sortedOnWall(windows) {
+    const pos = (w) => {
+      const n = Number(w.data.wall_position);
+      return w.data.wall_position && !Number.isNaN(n) ? n : Infinity;
+    };
+    return windows
+      .map((w, i) => [w, i])
+      .sort((a, b) => pos(a[0]) - pos(b[0]) || a[1] - b[1])
+      .map(([w]) => w);
+  }
+
+  _wallLabel(win) {
+    const pos = Number(win.data.wall_position);
+    return win.data.wall_position && !Number.isNaN(pos) ? `${Math.round(pos)}. ${win.title}` : win.title;
+  }
+
   // window markers and highlighted walls of the groups for the compass
   _houseLayers(house, { excludeGroup = null, extraWall = null, clickable = false } = {}) {
     if (!house) return {};
@@ -531,8 +552,8 @@ class ShutterAssistantPanel extends HTMLElement {
       if (g.id !== excludeGroup && g.data.wall && !walls[g.data.wall]) walls[g.data.wall] = this._groupColor(g.id);
     }
     if (extraWall?.wall) walls[extraWall.wall] = extraWall.color;
-    const markers = this._windows
-      .filter((w) => this._windowWall(w))
+    // the walls run from left to right as seen from inside, so the sorted order is the drawn order
+    const markers = this._sortedOnWall(this._windows.filter((w) => this._windowWall(w)))
       .map((w) => {
         const status = this._status(w);
         const open = this._windowOpen(w);
@@ -542,7 +563,7 @@ class ShutterAssistantPanel extends HTMLElement {
           wall: this._windowWall(w),
           color: MARKER_COLORS[status] || "var(--secondary-text-color)",
           open,
-          title: [w.title, statusText, open ? this.ui.markers.open : ""].filter(Boolean).join(" · "),
+          title: [this._wallLabel(w), statusText, open ? this.ui.markers.open : ""].filter(Boolean).join(" · "),
         };
       });
     return { house, walls, markers, clickable };
@@ -1248,7 +1269,14 @@ class ShutterAssistantPanel extends HTMLElement {
     const ui = this.ui;
     const [name, help] = this.label(key);
     const attrs = `data-scope="${scope}" data-k="${key}"`;
-    const helpHtml = help ? `<small>${esc(help)}</small>` : "";
+    let extra = "";
+    if (key === "wall_position") {
+      const wall = this._edit?.data?.wall || this._group(this._edit?.data?.group)?.data?.wall;
+      if (!this._house() || !wall) return "";
+      const others = this._sortedOnWall(this._windows.filter((w) => w.id !== this._edit.id && this._windowWall(w) === wall));
+      if (others.length) extra = `<small>${esc(ui.wallOthers(others.map((w) => this._wallLabel(w)).join(" · ")))}</small>`;
+    }
+    const helpHtml = (help ? `<small>${esc(help)}</small>` : "") + extra;
     const errHtml = error ? `<span class="field-error">${esc(this._errorText(error))}</span>` : "";
     const cls = `field ${error ? "invalid" : ""}`;
     if (key === "group") {
