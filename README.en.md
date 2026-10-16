@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.2.2.
+> Status: version 0.2.3.
 
 ## How it works
 
@@ -35,6 +35,8 @@ The integration is event driven: it only reacts to state changes of the configur
 ### Override
 
 Every manual movement (button, app; not by Shutter Assistant and not by other automations or scripts) starts an override for the window, default 60 min. Every further movement restarts it. Optionally it also ends at sunrise; duration 0 means only at sunrise. The integration remembers its own movements, so late position reports are not taken for manual movements.
+
+In the global settings (dashboard **General**, card **Manual override**) you choose when it starts: **only when the cover really moves** (default; the position changes by more than 2 %, covers without a position stand differently afterwards) or **with every command by hand, also without movement**. With the default, e.g. "Alexa, open all covers" starts no override for covers that are already open.
 
 ### Additional conditions instead of special rules
 
@@ -96,6 +98,7 @@ Values are checked exactly like in the dialogs (same ranges, units and rules). T
 | Vacation morning from, random period | 07:00, 60 min | |
 | Opening position from, to | 60 %, 100 % | |
 | Vacation evening from, random period | 19:00, 90 min | |
+| Override starts | only with a real movement | or with every command by hand, also without movement |
 | Restart protection | 5 min | |
 | Catch up the evening run from | 12:00 | |
 

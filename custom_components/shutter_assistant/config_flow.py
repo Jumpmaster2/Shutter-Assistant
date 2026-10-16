@@ -78,6 +78,7 @@ from .const import (
     CONF_OVERRIDE_DURATION,
     CONF_OVERRIDE_IGNORE_EVENING,
     CONF_OVERRIDE_SUNRISE,
+    CONF_OVERRIDE_TRIGGER,
     CONF_PV_SENSORS,
     CONF_RADIATION_SENSORS,
     CONF_STARTUP_DELAY,
@@ -118,6 +119,7 @@ from .const import (
     KIND_RADIATION,
     LANGUAGE_OPTIONS,
     NAME,
+    OVERRIDE_TRIGGERS,
     SECTION_CONDITIONS,
     SECTION_EVENING,
     SECTION_OVERRIDE,
@@ -267,6 +269,12 @@ def _vacation_schema(v: dict[str, Any]) -> vol.Schema:
     )
 
 
+def _override_schema(v: dict[str, Any]) -> vol.Schema:
+    return vol.Schema(
+        {_req(CONF_OVERRIDE_TRIGGER, v): _choice(OVERRIDE_TRIGGERS, "override_trigger")}
+    )
+
+
 def _startup_schema(v: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
@@ -363,7 +371,8 @@ class ShutterOptionsFlow(OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
-            step_id="init", menu_options=["general", "summer", "evening", "vacation", "startup"]
+            step_id="init",
+            menu_options=["general", "override", "summer", "evening", "vacation", "startup"],
         )
 
     async def async_step_general(
@@ -407,6 +416,13 @@ class ShutterOptionsFlow(OptionsFlow):
             data_schema=_vacation_schema(user_input or self._values),
             errors=errors,
         )
+
+    async def async_step_override(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self._save(user_input)
+        return self.async_show_form(step_id="override", data_schema=_override_schema(self._values))
 
     async def async_step_startup(
         self, user_input: dict[str, Any] | None = None

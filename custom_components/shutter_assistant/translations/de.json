@@ -65,6 +65,7 @@
         "title": "Einstellungen",
         "menu_options": {
           "general": "Allgemein",
+          "override": "Manuelle Übersteuerung",
           "summer": "Sommertag",
           "evening": "Abendmodus",
           "vacation": "Urlaubssimulation",
@@ -86,6 +87,16 @@
           "language": "Logbuch, letzter Grund und Push-Nachrichten.",
           "notify_services": "Erhalten eine Nachricht, wenn ein offenes Fenster den Sonnenschutz verhindert (z. B. notify.mobile_app_handy).",
           "workday_entity": "Optional, für die Morgenöffnung nach Uhrzeit (z. B. Workday-Integration). Ohne Sensor gelten Montag bis Freitag als Werktage."
+        }
+      },
+      "override": {
+        "title": "Manuelle Übersteuerung",
+        "description": "Wann eine Bedienung von Hand (Taster, App, Sprachassistent) die Übersteuerung eines Fensters startet. Dauer und weitere Einstellungen stehen am Fenster.",
+        "data": {
+          "override_trigger": "Übersteuerung beginnt"
+        },
+        "data_description": {
+          "override_trigger": "Nur bei echter Fahrt: Ein Befehl an ein Rollo, das schon in der Zielposition steht (z. B. „alle Rollos auf“, während es offen ist), startet keine Übersteuerung. Jeder Befehl: auch ohne Fahrt, wie bisher."
         }
       },
       "summer": {
@@ -452,6 +463,12 @@
       "options": {
         "sunrise": "Sonnenaufgang",
         "elevation": "Sonnenhöhe"
+      }
+    },
+    "override_trigger": {
+      "options": {
+        "movement": "Nur wenn das Rollo wirklich fährt",
+        "command": "Bei jedem Befehl von Hand, auch ohne Fahrt"
       }
     }
   },

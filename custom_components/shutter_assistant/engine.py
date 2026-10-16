@@ -90,6 +90,7 @@ from .const import (
     CONF_OVERRIDE_DURATION,
     CONF_OVERRIDE_IGNORE_EVENING,
     CONF_OVERRIDE_SUNRISE,
+    CONF_OVERRIDE_TRIGGER,
     CONF_STARTUP_DELAY,
     CONF_SUMMER_THRESHOLD,
     CONF_SUN_HOLD,
@@ -130,6 +131,7 @@ from .const import (
     SUBENTRY_GROUP,
     SUBENTRY_WINDOW,
     THRESHOLD_KEYS,
+    TRIGGER_COMMAND,
     WINDOW_CLOSED_DEBOUNCE,
     WINDOW_DEFAULTS,
 )
@@ -138,7 +140,7 @@ from .logic import sun as sunlib
 from .logic import window as rules
 from .logic.conditions import FollowUp, Hold, as_float, at_least, sensors_ok, summer_day
 from .logic.evening import EveningSettings, evening_day, evening_end, evening_start, is_evening
-from .logic.override import MOVING, CommandTracker, is_manual, override_until
+from .logic.override import MOVING, CommandTracker, MovementWatch, is_manual, override_until
 from .logic.vacation import random_position, random_time
 from .messages import resolve_language, text
 
@@ -239,6 +241,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self.vacation_evening_day: date | None = None
         self.startup_until: datetime | None = None
         self.tracker = CommandTracker()
+        self.movements = MovementWatch()
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
         )
@@ -1092,7 +1095,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             now.timestamp(),
         )
         old_pos = as_float(old.attributes.get("current_position")) if old else None
-        manual = self.automatic and is_manual(
+        started = self.automatic and is_manual(
             own=own,
             parent_id=new.context.parent_id,
             old_state=old.state if old else None,
@@ -1100,6 +1103,19 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             old_position=old_pos,
             new_position=new_pos,
         )
+        if self.opt(CONF_OVERRIDE_TRIGGER) == TRIGGER_COMMAND:
+            manual = started
+        else:
+            manual = self.movements.update(
+                entity_id,
+                started=started,
+                own=own,
+                old_state=old.state if old else None,
+                old_position=old_pos,
+                new_state=new.state,
+                new_position=new_pos,
+                now=now.timestamp(),
+            )
         for win in self.windows.values():
             if win.cover != entity_id:
                 continue

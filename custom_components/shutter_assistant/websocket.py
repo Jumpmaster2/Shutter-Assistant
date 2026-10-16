@@ -24,6 +24,7 @@ from .config_flow import (
     _group_schema,
     _notify_services,
     _number,
+    _override_schema,
     _startup_schema,
     _summer_schema,
     _time_key,
@@ -193,6 +194,7 @@ def _option_fields(hass: HomeAssistant, values: dict[str, Any]) -> dict[Any, Any
     fields: dict[Any, Any] = {}
     for schema in (
         _general_schema(hass, values),
+        _override_schema(values),
         _summer_schema(values),
         _evening_schema(values),
         _vacation_schema(values),
