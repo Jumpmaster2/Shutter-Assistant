@@ -29,7 +29,24 @@ const UI = {
       windows: ["Fenster", "Alle Fenster mit Gruppe, Status und Position."],
       groups: ["Gruppen", "Himmelsrichtungen mit ihren Sonnensensoren."],
       hints: ["Hinweise", ""],
+      house: ["Haus", "Für das Bild im Sonnenkompass. Sind alle drei Werte eingetragen, erscheint das Haus in der Mitte des Kompasses."],
     },
+    labels: {
+      house_azimuth: ["Vorderseite zeigt nach", "Himmelsrichtung, in die die Vorderseite schaut (90° = Ost, 180° = Süd, 270° = West), z. B. auf einer Karte abgelesen."],
+      house_width: ["Länge der Vorderseite", "Gilt auch für die Rückseite."],
+      house_depth: ["Tiefe", "Länge der beiden Seitenwände."],
+    },
+    wall: "Wand",
+    wallHelpGroup: "Setzt den Azimut-Bereich auf die Ausrichtung der Wand ± 90° (danach frei änderbar). Die Wand wird im Kompass in der Farbe der Gruppe gezeigt.",
+    wallHelpWindow: "Das Fenster erscheint an dieser Wand im Kompass. Ohne Angabe gilt die Wand der Gruppe.",
+    noWall: "Keine Wand",
+    likeGroup: (wall) => `Wie die Gruppe: ${wall}`,
+    noHouse: "Erst unter „Allgemein“ das Haus eintragen, dann lassen sich Wände wählen.",
+    houseIncomplete: "Sind alle drei Werte eingetragen, erscheint hier das Haus.",
+    front: "Vorderseite",
+    dirsLong: ["Nord", "Nordost", "Ost", "Südost", "Süd", "Südwest", "West", "Nordwest"],
+    wallName: (dir, deg) => `${dir}wand (${deg}°)`,
+    markers: { sun_protection: "Sonnenschutz", override: "Übersteuerung", evening: "Abend", open: "Fenster offen" },
     save: "Speichern",
     saved: "Gespeichert",
     cancel: "Abbrechen",
@@ -146,7 +163,24 @@ const UI = {
       windows: ["Windows", "All windows with group, status and position."],
       groups: ["Groups", "Directions of the sun with their sensors."],
       hints: ["Notes", ""],
+      house: ["House", "For the picture in the sun compass. When all three values are set, the house appears in the middle of the compass."],
     },
+    labels: {
+      house_azimuth: ["Front faces", "Direction the front looks to (90° = east, 180° = south, 270° = west), e.g. read from a map."],
+      house_width: ["Length of the front", "Also the back."],
+      house_depth: ["Depth", "Length of the two side walls."],
+    },
+    wall: "Wall",
+    wallHelpGroup: "Sets the azimuth sector to the direction of the wall ± 90° (can be changed afterwards). The wall is shown in the compass in the colour of the group.",
+    wallHelpWindow: "The window appears at this wall in the compass. Without a wall the wall of the group is used.",
+    noWall: "No wall",
+    likeGroup: (wall) => `Like the group: ${wall}`,
+    noHouse: "Enter the house under \"General\" first, then walls can be chosen.",
+    houseIncomplete: "When all three values are set, the house appears here.",
+    front: "front",
+    dirsLong: ["North", "North-east", "East", "South-east", "South", "South-west", "West", "North-west"],
+    wallName: (dir, deg) => `${dir} wall (${deg}°)`,
+    markers: { sun_protection: "Sun protection", override: "Override", evening: "Evening", open: "Window open" },
     save: "Save",
     saved: "Saved",
     cancel: "Cancel",
@@ -256,6 +290,7 @@ const SETTINGS = {
     { id: "sensors", icon: "mdi:thermometer", fields: ["outdoor_temperature", "weather", "language", "notify_services", "workday_entity"] },
     { id: "summer", icon: "mdi:white-balance-sunny", fields: ["summer_threshold", "day_change_time"] },
     { id: "startup", icon: "mdi:restart", fields: ["startup_delay", "catch_up_after"] },
+    { id: "house", icon: "mdi:home-outline", fields: ["house_azimuth", "house_width", "house_depth"], preview: true },
   ],
   evening: [
     { id: "evening", icon: "mdi:weather-sunset-down", fields: ["evening_earliest", "evening_elevation", "evening_latest", "night_end", "follow_up_earliest"] },
@@ -281,7 +316,7 @@ const MORNING_MODE_FIELDS = {
 
 // Window editor: cards with the fields that apply for the current values
 const WINDOW_CARDS = [
-  { id: "w_basics", icon: "mdi:window-shutter-cog", fields: () => ["name", "cover", "window_sensors", "group"] },
+  { id: "w_basics", icon: "mdi:window-shutter-cog", fields: () => ["name", "cover", "window_sensors", "group", "wall"] },
   {
     id: "w_sun",
     icon: "mdi:sun-angle-outline",
@@ -339,11 +374,19 @@ const WINDOW_CARDS = [
   },
 ];
 const GROUP_CARDS = [
-  { id: "g_basics", icon: "mdi:compass-outline", fields: () => ["name", "azimuth_from", "azimuth_to"] },
+  { id: "g_basics", icon: "mdi:compass-outline", fields: () => ["name", "wall", "azimuth_from", "azimuth_to"] },
   { id: "g_sensors", icon: "mdi:weather-sunny", fields: () => ["radiation_sensors", "pv_sensors", "lux_sensors"] },
 ];
 // changing one of these shows or hides other fields
-const REDRAW_KEYS = new Set(["group", "evening_custom", "morning_enabled", "morning_mode"]);
+const REDRAW_KEYS = new Set(["group", "wall", "evening_custom", "morning_enabled", "morning_mode"]);
+// walls of the house by their angle to the front (right and left seen from inside)
+const WALLS = [
+  ["front", 0],
+  ["right", 90],
+  ["back", 180],
+  ["left", 270],
+];
+const MARKER_COLORS = { sun_protection: "#ffa600", override: "#8e24aa", evening: "#5c6bc0", vacation: "#00897b" };
 
 const STATUS_STYLE = {
   off: ["mdi:pause-circle-outline", "muted"],
@@ -426,7 +469,7 @@ class ShutterAssistantPanel extends HTMLElement {
   }
 
   label(key) {
-    return (LABELS[this.lang] || LABELS.en)[key] || [key, ""];
+    return (LABELS[this.lang] || LABELS.en)[key] || this.ui.labels[key] || [key, ""];
   }
 
   _time(iso) {
@@ -448,6 +491,69 @@ class ShutterAssistantPanel extends HTMLElement {
 
   _dir(az) {
     return this.ui.dirs[Math.round((((Number(az) % 360) + 360) % 360) / 45) % 8];
+  }
+
+  // ------------------------------------------------------------------ house
+
+  // house from the options (or the values being edited), null until all three are set
+  _house(values = this._cfg?.options || {}) {
+    const az = Number(values.house_azimuth);
+    const width = Number(values.house_width);
+    const depth = Number(values.house_depth);
+    const set = (v) => v !== null && v !== undefined && v !== "";
+    if (![values.house_azimuth, values.house_width, values.house_depth].every(set)) return null;
+    if ([az, width, depth].some((v) => Number.isNaN(v)) || width <= 0 || depth <= 0) return null;
+    return { az, width, depth };
+  }
+
+  _wallFacing(house, wall) {
+    const offset = (WALLS.find(([id]) => id === wall) || [])[1];
+    return offset === undefined ? null : (((house.az + offset) % 360) + 360) % 360;
+  }
+
+  _wallName(house, wall) {
+    const facing = this._wallFacing(house, wall);
+    if (facing === null) return wall;
+    const dir = this.ui.dirsLong[Math.round(facing / 45) % 8];
+    const name = this.ui.wallName(dir, this._num(facing, 0));
+    return wall === "front" ? `${name} – ${this.ui.front}` : name;
+  }
+
+  _windowWall(win) {
+    return win.data.wall || this._group(win.data.group)?.data?.wall || null;
+  }
+
+  // window markers and highlighted walls of the groups for the compass
+  _houseLayers(house, { excludeGroup = null, extraWall = null, clickable = false } = {}) {
+    if (!house) return {};
+    const walls = {};
+    for (const g of this._groups) {
+      if (g.id !== excludeGroup && g.data.wall && !walls[g.data.wall]) walls[g.data.wall] = this._groupColor(g.id);
+    }
+    if (extraWall?.wall) walls[extraWall.wall] = extraWall.color;
+    const markers = this._windows
+      .filter((w) => this._windowWall(w))
+      .map((w) => {
+        const status = this._status(w);
+        const open = this._windowOpen(w);
+        const statusText = status ? (STATUS[this.lang] || STATUS.en)[status] || status : "";
+        return {
+          id: w.id,
+          wall: this._windowWall(w),
+          color: MARKER_COLORS[status] || "var(--secondary-text-color)",
+          open,
+          title: [w.title, statusText, open ? this.ui.markers.open : ""].filter(Boolean).join(" · "),
+        };
+      });
+    return { house, walls, markers, clickable };
+  }
+
+  _markerLegend(layers) {
+    if (!layers.markers?.length) return "";
+    const m = this.ui.markers;
+    const item = (color, text, open = false) =>
+      `<span class="legend-item"><span class="legend-mark ${open ? "open" : ""}" style="--mark:${color}"></span>${esc(text)}</span>`;
+    return `<div class="legend">${item(MARKER_COLORS.sun_protection, m.sun_protection)}${item(MARKER_COLORS.override, m.override)}${item(MARKER_COLORS.evening, m.evening)}${item("var(--secondary-text-color)", m.open, true)}</div>`;
   }
 
   // ------------------------------------------------------------------ data
@@ -880,10 +986,11 @@ class ShutterAssistantPanel extends HTMLElement {
           ${active ? `<span class="pill warn">${esc(ui.compass.inSector)}</span>` : ""}</button>`;
       })
       .join("");
+    const layers = this._houseLayers(this._house(), { clickable: true });
     return `<div class="card">
       <h2><ha-icon icon="mdi:compass-rose"></ha-icon>${esc(title)}</h2><p class="desc">${esc(desc)}</p>
-      <div class="compass-wrap">${this._compassSvg(this._groups.map((g) => ({ id: g.id, from: g.data.azimuth_from, to: g.data.azimuth_to, color: this._groupColor(g.id) })))}</div>
-      ${this._sunText()}
+      <div class="compass-wrap">${this._compassSvg(this._groups.map((g) => ({ id: g.id, from: g.data.azimuth_from, to: g.data.azimuth_to, color: this._groupColor(g.id) })), layers)}</div>
+      ${this._sunText()}${this._markerLegend(layers)}
       <div class="rows">${legend || `<div class="muted">${esc(ui.noGroups)}</div>`}</div>
     </div>`;
   }
@@ -898,10 +1005,12 @@ class ShutterAssistantPanel extends HTMLElement {
   }
 
   // sectors: [{from, to, color, highlight, faint}]
-  _compassSvg(sectors) {
+  // layers: {house, walls: {wall: color}, markers: [{id, wall, color, open, title}], labels}
+  _compassSvg(sectors, layers = {}) {
     const size = 240;
     const c = size / 2;
     const outer = 92;
+    const house = layers.house;
     const point = (az, r) => [c + r * Math.sin((az * Math.PI) / 180), c - r * Math.cos((az * Math.PI) / 180)];
     const arc = (from, to, r1, r2) => {
       let span = (((to - from) % 360) + 360) % 360;
@@ -915,7 +1024,9 @@ class ShutterAssistantPanel extends HTMLElement {
       const [x4, y4] = point(from, r1);
       return `M${x1.toFixed(2)} ${y1.toFixed(2)} A${r2} ${r2} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} L${x3.toFixed(2)} ${y3.toFixed(2)} A${r1} ${r1} 0 ${large} 0 ${x4.toFixed(2)} ${y4.toFixed(2)} Z`;
     };
-    const band = Math.max(8, Math.min(18, 54 / Math.max(1, sectors.length)));
+    const count = Math.max(1, sectors.length);
+    // with a house the rings get narrower so the house has room in the middle
+    const band = house ? Math.max(3, Math.min(14, (30 - 2 * count) / count)) : Math.max(8, Math.min(18, 54 / count));
     const rings = sectors
       .map((s, i) => {
         const r2 = outer - 2 - i * (band + 2);
@@ -942,7 +1053,11 @@ class ShutterAssistantPanel extends HTMLElement {
         return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" class="dir">${dirs[i * 2]}</text>`;
       })
       .join("");
+    const inner = outer - 2 - (sectors.length ? sectors.length * (band + 2) : 0) - 6;
+    // the sun is drawn over the house, the window markers and labels over the sun
+    const houseSvg = house ? this._houseSvg(house, layers, c, inner) : { base: "", top: "" };
     const sun = this._state("sun.sun")?.attributes;
+    let sunRay = "";
     let sunMark = "";
     if (sun && sun.azimuth !== undefined) {
       const az = Number(sun.azimuth);
@@ -951,16 +1066,82 @@ class ShutterAssistantPanel extends HTMLElement {
       const r = below ? outer + 6 : Math.max(0, outer * (1 - Math.min(90, el) / 90));
       const [x, y] = point(az, r);
       const [rx, ry] = point(az, outer + 6);
-      sunMark = `<line x1="${c}" y1="${c}" x2="${rx.toFixed(1)}" y2="${ry.toFixed(1)}" class="sun-ray ${below ? "below" : ""}"></line>
-        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${below ? 6 : 9}" class="sun ${below ? "below" : ""}"></circle>`;
+      sunRay = `<line x1="${c}" y1="${c}" x2="${rx.toFixed(1)}" y2="${ry.toFixed(1)}" class="sun-ray ${below ? "below" : ""}"></line>`;
+      sunMark = `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${below ? 6 : 9}" class="sun ${below ? "below" : ""}"></circle>`;
     }
     return `<svg viewBox="0 0 ${size} ${size}" class="compass" role="img">
       <circle cx="${c}" cy="${c}" r="${outer}" class="ring"></circle>
       <circle cx="${c}" cy="${c}" r="${(outer * 2) / 3}" class="ring inner"></circle>
       <circle cx="${c}" cy="${c}" r="${outer / 3}" class="ring inner"></circle>
-      ${ticks}${rings}${labels}${sunMark}
-      <circle cx="${c}" cy="${c}" r="2.5" class="center"></circle>
+      ${ticks}${rings}${labels}${sunRay}${houseSvg.base}${sunMark}${houseSvg.top}
+      ${house ? "" : `<circle cx="${c}" cy="${c}" r="2.5" class="center"></circle>`}
     </svg>`;
+  }
+
+  // the house as a turned rectangle in the middle of the compass, scaled to the free room
+  _houseSvg(house, layers, c, inner) {
+    const u = (az) => [Math.sin((az * Math.PI) / 180), -Math.cos((az * Math.PI) / 180)];
+    const [fx, fy] = u(house.az);
+    const [rx, ry] = u(house.az + 90);
+    const room = Math.max(12, inner) * (layers.labels ? 0.68 : 0.9);
+    const scale = room / (0.5 * Math.hypot(house.width, house.depth));
+    const hw = (house.width / 2) * scale;
+    const hd = (house.depth / 2) * scale;
+    // f: towards the front, r: towards the right (seen from inside)
+    const pt = (f, r) => [c + fx * f + rx * r, c + fy * f + ry * r];
+    const n = (v) => v.toFixed(1);
+    const line = ([x1, y1], [x2, y2]) => `x1="${n(x1)}" y1="${n(y1)}" x2="${n(x2)}" y2="${n(y2)}"`;
+    const points = (list) => list.map(([x, y]) => `${n(x)},${n(y)}`).join(" ");
+    const FL = pt(hd, -hw);
+    const FR = pt(hd, hw);
+    const BR = pt(-hd, hw);
+    const BL = pt(-hd, -hw);
+    const walls = { front: [FL, FR], right: [FR, BR], back: [BR, BL], left: [BL, FL] };
+    const ridge = house.width >= house.depth ? line(pt(0, -hw * 0.8), pt(0, hw * 0.8)) : line(pt(-hd * 0.8, 0), pt(hd * 0.8, 0));
+    let svg = `<polygon points="${points([FL, FR, BR, BL])}" class="house"></polygon><line ${ridge} class="ridge"></line>`;
+    for (const [wall, color] of Object.entries(layers.walls || {})) {
+      if (walls[wall]) svg += `<line ${line(...walls[wall])} class="wall-mark" style="stroke:${color}"><title>${esc(this._wallName(house, wall))}</title></line>`;
+    }
+    svg += `<polygon points="${points([pt(hd + 7, 0), pt(hd + 2, -4), pt(hd + 2, 4)])}" class="front-mark"><title>${esc(this.ui.front)}</title></polygon>`;
+    let top = "";
+    const byWall = {};
+    for (const m of layers.markers || []) (byWall[m.wall] ||= []).push(m);
+    for (const [wall, list] of Object.entries(byWall)) {
+      if (!walls[wall]) continue;
+      const [[x1, y1], [x2, y2]] = walls[wall];
+      const length = Math.hypot(x2 - x1, y2 - y1) || 1;
+      const half = Math.min(5, (length / (list.length + 1)) * 0.4);
+      const [dx, dy] = [(x2 - x1) / length, (y2 - y1) / length];
+      list.forEach((m, i) => {
+        const t = (i + 1) / (list.length + 1);
+        const [mx, my] = [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+        const ends = [[mx - dx * half, my - dy * half], [mx + dx * half, my + dy * half]];
+        const edit = layers.clickable ? ` data-edit="window" data-id="${esc(m.id)}"` : "";
+        top += `<g class="marker ${layers.clickable ? "link" : ""}"${edit}><title>${esc(m.title)}</title>
+          <line ${line(...ends)} class="marker-edge"></line><line ${line(...ends)} class="marker-line" style="stroke:${m.color}"></line>${m.open ? `<line ${line(...ends)} class="marker-open"></line>` : ""}</g>`;
+      });
+    }
+    if (layers.labels) {
+      for (const [wall, offset] of WALLS) {
+        const [[x1, y1], [x2, y2]] = walls[wall];
+        const [nx, ny] = u(house.az + offset);
+        const facing = this._wallFacing(house, wall);
+        top += `<text x="${n((x1 + x2) / 2 + nx * 10)}" y="${n((y1 + y2) / 2 + ny * 10)}" class="wall-label">${esc(this._dir(facing))}</text>`;
+      }
+    }
+    return { base: `<g class="house-layer">${svg}</g>`, top: `<g class="house-layer">${top}</g>` };
+  }
+
+  // compass of the house card (values being edited)
+  _housePreview() {
+    const values = {};
+    for (const key of ["house_azimuth", "house_width", "house_depth"]) values[key] = this._value("house", key);
+    const house = this._house(values);
+    const layers = house ? { ...this._houseLayers(house), labels: true } : {};
+    const walls = house
+      ? `<div class="wall-list">${WALLS.map(([wall]) => `<span class="chip">${esc(this._wallName(house, wall))}</span>`).join("")}</div>`
+      : `<div class="muted small center">${esc(this.ui.houseIncomplete)}</div>`;
+    return `${this._compassSvg([], layers)}${walls}`;
   }
 
   // ------------------------------------------------------------------ windows tab
@@ -1042,9 +1223,10 @@ class ShutterAssistantPanel extends HTMLElement {
     const dirty = !!this._drafts[card.id];
     const errors = this._errors[card.id] || {};
     const fields = card.fields.map((key) => this._field(card.id, key, this._value(card.id, key), errors[key])).join("");
+    const preview = card.preview ? `<div class="compass-wrap small" data-house-preview>${this._housePreview()}</div>` : "";
     return `<div class="card" data-card="${card.id}">
       <h2><ha-icon icon="${card.icon}"></ha-icon>${esc(title)}</h2>${desc ? `<p class="desc">${esc(desc)}</p>` : ""}
-      <div class="fields">${fields}</div>
+      ${preview}<div class="fields">${fields}</div>
       <div class="actions"><span class="msg ${Object.keys(errors).length ? "bad" : ""}">${Object.keys(errors).length ? esc(this._errorSummary(errors, card.fields)) : ""}</span>
         ${dirty ? `<button class="btn" data-cancel="${card.id}">${esc(ui.cancel)}</button>` : ""}
         <button class="btn primary" data-save="${card.id}" ${dirty ? "" : "disabled"}>${esc(ui.save)}</button></div></div>`;
@@ -1075,6 +1257,17 @@ class ShutterAssistantPanel extends HTMLElement {
         ${this._groups.map((g) => `<option value="${esc(g.id)}" ${g.id === value ? "selected" : ""}>${esc(g.title)}</option>`).join("")}
         ${value && !this._group(value) ? `<option value="${esc(value)}" selected>${esc(value)} (${esc(ui.notFound)})</option>` : ""}
         </select>${errHtml}${helpHtml}</label>`;
+    }
+    if (key === "wall") {
+      const house = this._house();
+      const isWindow = this._edit?.type === "window";
+      if (!house) return `<div class="field"><span class="lbl">${esc(ui.wall)}</span><small>${esc(ui.noHouse)}</small></div>`;
+      const groupWall = isWindow ? this._group(this._edit.data.group)?.data?.wall : null;
+      const empty = groupWall ? ui.likeGroup(this._wallName(house, groupWall)) : ui.noWall;
+      return `<label class="${cls}"><span class="lbl">${esc(ui.wall)}</span><select ${attrs} data-kind="wall">
+        <option value="">${esc(empty)}</option>
+        ${WALLS.map(([wall]) => `<option value="${wall}" ${wall === value ? "selected" : ""}>${esc(this._wallName(house, wall))}</option>`).join("")}
+        </select>${errHtml}<small>${esc(isWindow ? ui.wallHelpWindow : ui.wallHelpGroup)}</small></label>`;
     }
     const info = this._cfg.fields?.[key];
     if (!info) return "";
@@ -1211,8 +1404,10 @@ class ShutterAssistantPanel extends HTMLElement {
     const sectors = this._groups
       .filter((g) => g.id !== e.id)
       .map((g) => ({ from: g.data.azimuth_from, to: g.data.azimuth_to, color: this._groupColor(g.id), faint: true }));
-    sectors.unshift({ from: e.data.azimuth_from, to: e.data.azimuth_to, color: e.id ? this._groupColor(e.id) : GROUP_COLORS[this._groups.length % GROUP_COLORS.length], highlight: true });
-    return `${this._compassSvg(sectors)}${this._sunText()}`;
+    const color = e.id ? this._groupColor(e.id) : GROUP_COLORS[this._groups.length % GROUP_COLORS.length];
+    sectors.unshift({ from: e.data.azimuth_from, to: e.data.azimuth_to, color, highlight: true });
+    const layers = this._houseLayers(this._house(), { excludeGroup: e.id, extraWall: { wall: e.data.wall, color } });
+    return `${this._compassSvg(sectors, layers)}${this._sunText()}`;
   }
 
   _openEditor(type, item, notice) {
@@ -1245,6 +1440,12 @@ class ShutterAssistantPanel extends HTMLElement {
   _setValue(scope, key, value, redraw = false) {
     if (scope === "edit") {
       this._edit.data[key] = value;
+      if (key === "wall" && value && this._edit.type === "group") {
+        const facing = this._wallFacing(this._house() || { az: 0 }, value);
+        // the sun shines on a wall while it is less than 90° beside its direction
+        this._edit.data.azimuth_from = Math.round((facing + 270) % 360);
+        this._edit.data.azimuth_to = Math.round((facing + 90) % 360);
+      }
       this._edit.dirty = true;
       if (this._edit.errors?.[key]) delete this._edit.errors[key];
       const save = this.shadowRoot.querySelector('[data-action="save-sub"]');
@@ -1261,6 +1462,8 @@ class ShutterAssistantPanel extends HTMLElement {
     this._drafts[scope][key] = value;
     const save = this.shadowRoot.querySelector(`[data-save="${scope}"]`);
     if (save) save.disabled = false;
+    const preview = scope === "house" && this.shadowRoot.querySelector("[data-house-preview]");
+    if (preview) preview.innerHTML = this._housePreview();
     if (redraw) this._rerenderContent();
   }
 
@@ -1285,7 +1488,7 @@ class ShutterAssistantPanel extends HTMLElement {
       if (sw?.classList.contains("switch")) sw.classList.toggle("on", value);
     } else if (kind === "number") {
       value = el.value === "" ? null : Number(el.value);
-    } else if (kind === "group") {
+    } else if (kind === "group" || kind === "wall") {
       if (!isChange) return;
       value = el.value || null;
     } else if (kind === "select") {
@@ -1359,6 +1562,7 @@ class ShutterAssistantPanel extends HTMLElement {
       return;
     }
     if (d.edit) {
+      if (this._edit?.dirty && !confirm(this.ui.discard)) return;
       const item = (d.edit === "window" ? this._windows : this._groups).find((x) => x.id === d.id);
       if (item) this._openEditor(d.edit, item);
       return;
@@ -1636,6 +1840,20 @@ td .shutter { width:16px; height:22px; border-width:1.5px; margin-right:6px; }
 .compass .sun-ray { stroke:#f9a825; stroke-width:1.5; stroke-dasharray:3 3; }
 .compass .sun-ray.below { stroke:var(--disabled-text-color, #9e9e9e); }
 .compass .center { fill:var(--secondary-text-color); }
+.compass .house { fill:var(--card-background-color, #fff); stroke:var(--primary-text-color, #212121); stroke-width:1.5; stroke-linejoin:round; }
+.compass .ridge { stroke:var(--secondary-text-color); stroke-width:1; stroke-dasharray:3 2; }
+.compass .wall-mark { stroke-width:4; stroke-linecap:round; }
+.compass .front-mark { fill:var(--primary-text-color, #212121); }
+.compass .marker.link { cursor:pointer; }
+.compass .marker-edge { stroke:var(--card-background-color, #fff); stroke-width:8; }
+.compass .marker-line { stroke-width:5; }
+.compass .marker-open { stroke:var(--card-background-color, #fff); stroke-width:2; }
+.compass .wall-label { fill:var(--secondary-text-color); font-size:10px; font-weight:500; text-anchor:middle; dominant-baseline:central; }
+.legend { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 12px; font-size:12px; color:var(--secondary-text-color); margin:-2px 0 8px; }
+.legend-item { display:inline-flex; align-items:center; gap:5px; }
+.legend-mark { display:inline-block; width:12px; height:5px; background:var(--mark); }
+.legend-mark.open { background:none; border:1.5px solid var(--mark); height:7px; }
+.wall-list { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:2px; }
 .sun-text { display:flex; align-items:center; justify-content:center; gap:6px; font-size:13px; color:var(--secondary-text-color); margin:2px 0 8px; text-align:center; }
 .sun-text ha-icon { --mdc-icon-size:18px; color:#f9a825; }
 .table-wrap { width:100%; overflow-x:auto; }

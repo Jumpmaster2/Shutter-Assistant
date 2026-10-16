@@ -466,7 +466,12 @@ class GroupSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             errors = _validate_group(user_input)
             if not errors:
-                data = {**user_input, CONF_NAME: str(user_input[CONF_NAME]).strip()}
+                # keep values only the panel sets (wall of the house)
+                data = {
+                    **subentry.data,
+                    **user_input,
+                    CONF_NAME: str(user_input[CONF_NAME]).strip(),
+                }
                 return self.async_update_and_abort(
                     self._get_entry(), subentry, title=data[CONF_NAME], data=data
                 )

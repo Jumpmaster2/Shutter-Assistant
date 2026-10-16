@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.2.0.
+> Status: version 0.2.1.
 
 ## How it works
 
@@ -73,6 +73,7 @@ After the setup there is a **Shutter Assistant** page in the sidebar (administra
 * **Overview:** automatic on/off, summer day (forecast and threshold), start of the evening mode, vacation and restart protection. Next to it the **sun compass** with the current position of the sun and the sectors of the groups, notes (e.g. configured entities that do not exist, or a deleted group) and all windows with status, position, window contact and last reason. A running override can be **ended** right there. The **sun condition check** shows every part of the condition per window with the current value and threshold: summer day, outdoor temperature, every sun sensor, hold time (with the time it will be met) and whether the sun is in the sector.
 * **Windows:** all windows as a table, click to edit. The editor shows the settings by topic in cards (window, sun protection, detect manual sun protection, evening, override, ventilation & vacation, morning opening, additional conditions). Only the fields that apply are shown: thresholds only for the sensor types of the group, own evening times only when switched on, for the morning opening only the fields of the chosen mode. **Duplicate** creates a new window with the same settings; only cover and window contacts are chosen again.
 * **Groups:** directions of the sun with the current values of their sensors and the windows using them. While editing, the compass shows the sector of the group right away.
+* **House in the compass** (under **General**): length of the front, depth and the direction the front faces. When all three values are set, the house appears to scale and turned in the middle of the compass. A group can then get a **wall**: the azimuth sector is set to the direction of the wall ± 90° (can be changed afterwards) and the wall is shown in the colour of the group. **Windows** appear as marks at their wall (own wall or the one of the group), coloured live by sun protection, override and evening, hollow when the window is open; a click opens the window.
 * **General** and **Evening & vacation:** the global settings in cards, each card is saved on its own.
 
 Values are checked exactly like in the dialogs (same ranges, units and rules). The dialogs (options, add or change group and window) are still available.
