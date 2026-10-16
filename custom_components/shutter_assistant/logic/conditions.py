@@ -128,15 +128,32 @@ def room_warm(
     return current >= limit
 
 
-def cooling_active(hvac_mode: str | None, hvac_action: str | None) -> bool:
+def cooling_active(
+    hvac_mode: str | None,
+    hvac_action: str | None,
+    current: float | None = None,
+    target: float | None = None,
+) -> bool:
     """Is an air conditioner cooling?
 
     It cools while its action is ``cooling``. In the mode ``cool`` it also counts
     while idle (it holds the room cool) and when it reports no action.
+
+    Many air conditioners (e.g. Midea) report no action at all. In the mode
+    ``auto`` or ``heat_cool`` it then counts as cooling while the room is warmer
+    than its target.
     """
     if hvac_action == "cooling":
         return True
-    return hvac_mode == "cool" and hvac_action in (None, "idle", "cooling")
+    if hvac_mode == "cool":
+        return hvac_action in (None, "idle")
+    return (
+        hvac_mode in ("auto", "heat_cool")
+        and hvac_action is None
+        and current is not None
+        and target is not None
+        and current > target
+    )
 
 
 def heat_need(room: bool | None, cooling: bool, heating_day: bool) -> bool:
