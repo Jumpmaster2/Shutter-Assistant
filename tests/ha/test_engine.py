@@ -649,3 +649,137 @@ async def test_control_attributes(
     assert status["window_open"] is False
     assert status["evening_start"].startswith("2026-07-01T21:00")
     assert status["override_until"] is None
+
+
+AUTUMN_AFTERNOON = "2026-10-16 15:00:00+02:00"
+ROOM = "climate.living_room"
+AIR_CONDITIONER = "climate.living_room_ac"
+HEATING_DAY = "binary_sensor.heating_day"
+
+
+def _forecast_service(hass: HomeAssistant, high: float, low_tomorrow: float | None) -> None:
+    forecast: list[dict] = [{"temperature": high, "templow": 8.0}]
+    if low_tomorrow is not None:
+        forecast.append({"temperature": high, "templow": low_tomorrow})
+
+    async def get_forecasts(call: ServiceCall) -> dict:
+        return {"weather.home": {"forecast": forecast}}
+
+    hass.states.async_set("weather.home", "sunny")
+    hass.services.async_register(
+        "weather", "get_forecasts", get_forecasts, supports_response=SupportsResponse.ONLY
+    )
+
+
+async def _autumn_afternoon(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, night_low: float | None
+) -> None:
+    freezer.move_to(AUTUMN_AFTERNOON)
+    _forecast_service(hass, 19.4, night_low)
+    await setup_entry(hass, make_entry(weather="weather.home"))
+    # a warm autumn afternoon: the outdoor temperature rises above 23 °C
+    hass.states.async_set(OUTDOOR, "24.5")
+    await hass.async_block_till_done()
+
+
+async def test_warm_autumn_afternoon_with_cool_night_is_no_summer_day(
+    hass: HomeAssistant, base_states, calls, hass_storage, freezer: FrozenDateTimeFactory
+) -> None:
+    await _autumn_afternoon(hass, freezer, night_low=9.0)
+    engine = hass.config_entries.async_entries("shutter_assistant")[0].runtime_data
+    assert engine.forecast_night_low == 9.0
+    assert hass.states.get(SUMMER).state == "off"
+    await advance(hass, freezer, 20 * 60)
+    assert calls["set_cover_position"] == []
+    details = engine.sun_details(engine.windows[WINDOW_ID])
+    assert details["raised_by_outdoor_temperature"]
+    assert details["night_low"] == 9.0
+    assert details["night_threshold"] == 14.0
+
+
+async def test_warm_autumn_afternoon_with_warm_night_is_a_summer_day(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    await _autumn_afternoon(hass, freezer, night_low=15.0)
+    assert hass.states.get(SUMMER).state == "on"
+    await advance(hass, freezer, 15 * 60)
+    assert [c.data["position"] for c in calls["set_cover_position"]] == [10]
+
+
+async def test_night_low_falls_back_to_today_and_is_restored(
+    hass: HomeAssistant, base_states, calls, hass_storage, freezer: FrozenDateTimeFactory
+) -> None:
+    await _autumn_afternoon(hass, freezer, night_low=None)
+    entry = hass.config_entries.async_entries("shutter_assistant")[0]
+    assert entry.runtime_data.forecast_night_low == 8.0
+    await advance(hass, freezer, 10)
+    stored = hass_storage[f"shutter_assistant.{entry.entry_id}"]["data"]
+    assert stored["forecast_night_low"] == 8.0
+
+
+def _room(hass: HomeAssistant, current: float, setpoint: float = 21.0) -> None:
+    hass.states.async_set(ROOM, "heat", {"current_temperature": current, "temperature": setpoint})
+
+
+async def test_sun_protection_waits_for_a_warm_room(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    _room(hass, 21.5)
+    await _summer_noon(hass, freezer, window={"room_entity": ROOM})
+    await advance(hass, freezer, 30 * 60)
+    assert calls["set_cover_position"] == []
+    # setpoint 21 °C + 2 K reached: lowered after the sun hold time
+    _room(hass, 23.0)
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 4 * 60)
+    assert calls["set_cover_position"] == []
+    await advance(hass, freezer, 60)
+    assert [c.data["position"] for c in calls["set_cover_position"]] == [10]
+
+
+async def test_room_sensor_uses_the_fixed_threshold(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    hass.states.async_set("sensor.room", "23.5", {"unit_of_measurement": "°C"})
+    await _summer_noon(hass, freezer, window={"room_entity": "sensor.room"})
+    await advance(hass, freezer, 20 * 60)
+    assert calls["set_cover_position"] == []
+    hass.states.async_set("sensor.room", "24.0", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 5 * 60)
+    assert len(calls["set_cover_position"]) == 1
+
+
+async def test_cooling_air_conditioner_counts_as_warm_room(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    _room(hass, 21.0)
+    hass.states.async_set(AIR_CONDITIONER, "cool", {"hvac_action": "cooling"})
+    await _summer_noon(
+        hass, freezer, window={"room_entity": ROOM, "cooling_entity": AIR_CONDITIONER}
+    )
+    await advance(hass, freezer, 15 * 60)
+    assert [c.data["position"] for c in calls["set_cover_position"]] == [10]
+
+
+async def test_heating_day_keeps_the_warmth_of_the_sun(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    hass.states.async_set(HEATING_DAY, "on")
+    await _summer_noon(hass, freezer, heating_entity=HEATING_DAY)
+    await advance(hass, freezer, 30 * 60)
+    assert calls["set_cover_position"] == []
+    hass.states.async_set(HEATING_DAY, "off")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 5 * 60)
+    assert len(calls["set_cover_position"]) == 1
+
+
+async def test_heating_day_with_a_too_warm_room_still_protects(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    hass.states.async_set(HEATING_DAY, "on")
+    _room(hass, 23.5)
+    await _summer_noon(hass, freezer, heating_entity=HEATING_DAY, window={"room_entity": ROOM})
+    await advance(hass, freezer, 15 * 60)
+    assert len(calls["set_cover_position"]) == 1

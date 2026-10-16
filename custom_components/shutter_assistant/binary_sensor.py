@@ -49,6 +49,7 @@ class SummerDay(GlobalEntity, BinarySensorEntity):
         engine = self.coordinator
         return {
             "forecast_max": engine.forecast_max,
+            "forecast_night_low": engine.forecast_night_low,
             "forecast_day": engine.forecast_day.isoformat() if engine.forecast_day else None,
             "raised_by_outdoor_temperature": engine.raised_day is not None
             and engine.raised_day == engine._sun_day(dt_util.now()),

@@ -37,6 +37,7 @@ from .const import (
     CONF_AZIMUTH_TO,
     CONF_CATCH_UP_AFTER,
     CONF_CLOSED_POSITION,
+    CONF_COOLING_ENTITY,
     CONF_COVER,
     CONF_DAY_CHANGE,
     CONF_EVENING_CLOSE,
@@ -47,6 +48,7 @@ from .const import (
     CONF_FOLLOW_UP_CLOSE,
     CONF_FOLLOW_UP_EARLIEST,
     CONF_GROUP,
+    CONF_HEATING_ENTITY,
     CONF_LANGUAGE,
     CONF_LUX_SENSORS,
     CONF_MANUAL_AT_SUN,
@@ -70,6 +72,7 @@ from .const import (
     CONF_MORNING_WORKDAY,
     CONF_NAME,
     CONF_NIGHT_END,
+    CONF_NIGHT_THRESHOLD,
     CONF_NOTIFY,
     CONF_NOTIFY_OPEN,
     CONF_OPEN_BLOCK,
@@ -81,6 +84,9 @@ from .const import (
     CONF_OVERRIDE_TRIGGER,
     CONF_PV_SENSORS,
     CONF_RADIATION_SENSORS,
+    CONF_ROOM_ENTITY,
+    CONF_ROOM_MARGIN,
+    CONF_ROOM_THRESHOLD,
     CONF_STARTUP_DELAY,
     CONF_SUMMER_THRESHOLD,
     CONF_SUN_HOLD,
@@ -230,6 +236,8 @@ def _summer_schema(v: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
             _req(CONF_SUMMER_THRESHOLD, v): _number(0, 45, 0.5, "°C"),
+            _req(CONF_NIGHT_THRESHOLD, v): _number(-10, 30, 0.5, "°C"),
+            _opt(CONF_HEATING_ENTITY, v): _entity(["binary_sensor", "input_boolean", "switch"]),
             _req(CONF_DAY_CHANGE, v): TimeSelector(),
         }
     )
@@ -538,6 +546,10 @@ def window_sun_fields(values: dict[str, Any], group_data: dict[str, Any]) -> dic
         {
             _wreq(CONF_TEMP_THRESHOLD, values): _number(-20, 45, 0.5, "°C"),
             _wreq(CONF_TEMP_HOLD, values): _number(0, 120, 1, "min"),
+            _opt(CONF_ROOM_ENTITY, values): _entity(["climate", "sensor"]),
+            _wreq(CONF_ROOM_MARGIN, values): _number(0, 10, 0.5, "K"),
+            _wreq(CONF_ROOM_THRESHOLD, values): _number(10, 40, 0.5, "°C"),
+            _opt(CONF_COOLING_ENTITY, values): _entity(["climate"]),
             _wreq(CONF_SUN_HOLD, values): _number(0, 120, 1, "min"),
             _wreq(CONF_SUN_POSITION, values): _number(0, 100, 1, "%"),
             _wreq(CONF_TOLERANCE, values): _number(0, 50, 1, "%"),

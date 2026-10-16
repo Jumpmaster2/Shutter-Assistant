@@ -29,6 +29,12 @@ CONF_NOTIFY = "notify_services"
 CONF_WORKDAY = "workday_entity"
 
 CONF_SUMMER_THRESHOLD = "summer_threshold"
+# A summer day only by the outdoor temperature needs a forecast low of the
+# coming night of at least this value.
+CONF_NIGHT_THRESHOLD = "night_threshold"
+# On while heating is wanted (e.g. the heating day of AI Heating Assistant):
+# then the warmth of the sun is welcome unless a room is too warm.
+CONF_HEATING_ENTITY = "heating_entity"
 CONF_DAY_CHANGE = "day_change_time"
 
 CONF_EVENING_EARLIEST = "evening_earliest"
@@ -61,6 +67,7 @@ DEFAULTS: Final[dict[str, object]] = {
     CONF_LANGUAGE: "auto",
     CONF_NOTIFY: [],
     CONF_SUMMER_THRESHOLD: 23.0,
+    CONF_NIGHT_THRESHOLD: 14.0,
     CONF_DAY_CHANGE: "01:00:00",
     CONF_EVENING_EARLIEST: "17:00:00",
     CONF_EVENING_ELEVATION: -4.0,
@@ -126,6 +133,13 @@ CONF_RADIATION_THRESHOLD = "radiation_threshold"
 CONF_TEMP_THRESHOLD = "temperature_threshold"
 CONF_TEMP_HOLD = "temperature_hold"
 CONF_SUN_HOLD = "sun_hold"
+# Room temperature: a thermostat (climate, too warm from setpoint + margin) or a
+# temperature sensor (too warm from the threshold).
+CONF_ROOM_ENTITY = "room_entity"
+CONF_ROOM_MARGIN = "room_margin"
+CONF_ROOM_THRESHOLD = "room_threshold"
+# Air conditioner: while it cools, the room counts as too warm.
+CONF_COOLING_ENTITY = "cooling_entity"
 CONF_SUN_POSITION = "sun_position"
 CONF_TOLERANCE = "position_tolerance"
 CONF_AUTO_UP = "auto_up"
@@ -192,6 +206,8 @@ WINDOW_DEFAULTS: Final[dict[str, object]] = {
     CONF_TEMP_THRESHOLD: 19.0,
     CONF_TEMP_HOLD: 10,
     CONF_SUN_HOLD: 5,
+    CONF_ROOM_MARGIN: 2.0,
+    CONF_ROOM_THRESHOLD: 24.0,
     CONF_SUN_POSITION: 10,
     CONF_TOLERANCE: 5,
     CONF_AUTO_UP: True,
