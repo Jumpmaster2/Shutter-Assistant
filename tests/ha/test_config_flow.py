@@ -8,7 +8,7 @@ from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.shutter_assistant.const import DOMAIN, SUBENTRY_GROUP, SUBENTRY_WINDOW
 
-from .conftest import COVER, GROUP_ID, OUTDOOR, PV, WINDOW_ID, make_entry, setup_entry
+from .conftest import COVER, GROUP_DATA, GROUP_ID, OUTDOOR, PV, WINDOW_ID, make_entry, setup_entry
 
 GENERAL = {"outdoor_temperature": OUTDOOR, "language": "auto", "notify_services": []}
 SUMMER = {"summer_threshold": 23.0, "day_change_time": "01:00:00"}
@@ -99,6 +99,23 @@ async def test_group_subentry(hass: HomeAssistant, base_states) -> None:
     )
     assert result["type"] is FlowResultType.ABORT
     assert entry.subentries[GROUP_ID].data["azimuth_from"] == 100
+
+
+async def test_group_dialog_keeps_the_wall(hass: HomeAssistant, base_states) -> None:
+    """The wall is only set in the panel; changing the group in the dialog keeps it."""
+    entry = make_entry(group={**GROUP_DATA, "wall": "front"})
+    await setup_entry(hass, entry)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_GROUP),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": GROUP_ID},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"name": "South", "azimuth_from": 100, "azimuth_to": 260}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    data = entry.subentries[GROUP_ID].data
+    assert data["azimuth_from"] == 100
+    assert data["wall"] == "front"
 
 
 async def test_window_subentry_with_group_and_morning(hass: HomeAssistant, base_states) -> None:

@@ -10,13 +10,20 @@ from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState, ConfigSubentry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.selector import Selector, TimeSelector
+from homeassistant.helpers.selector import (
+    Selector,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+    TimeSelector,
+)
 
 from .config_flow import (
     _evening_schema,
     _general_schema,
     _group_schema,
     _notify_services,
+    _number,
     _startup_schema,
     _summer_schema,
     _time_key,
@@ -41,12 +48,16 @@ from .const import (
     CONF_EVENING_ELEVATION,
     CONF_EVENING_LATEST,
     CONF_GROUP,
+    CONF_HOUSE_AZIMUTH,
+    CONF_HOUSE_DEPTH,
+    CONF_HOUSE_WIDTH,
     CONF_MORNING,
     CONF_MORNING_MODE,
     CONF_MORNING_TRIGGER,
     CONF_NAME,
     CONF_OPEN_BLOCK,
     CONF_OUTDOOR_TEMP,
+    CONF_WALL,
     CONF_WEATHER,
     CONF_WINDOW_EXCEPTION,
     CONF_WORKDAY,
@@ -56,6 +67,7 @@ from .const import (
     SENSOR_KINDS,
     SUBENTRY_GROUP,
     SUBENTRY_WINDOW,
+    WALLS,
     WINDOW_DEFAULTS,
 )
 from .logic.morning import MODES
@@ -78,7 +90,28 @@ WINDOW_ENTITIES = {
     "evening_closed": "binary_sensor",
 }
 
-OPTION_KEYS = {*DEFAULTS, CONF_OUTDOOR_TEMP, CONF_WEATHER, CONF_WORKDAY}
+# Settings only the panel has: the house in the sun compass (shown when all
+# three are set) and the wall of a group or window.
+HOUSE_FIELDS: dict[Any, Any] = {
+    vol.Optional(CONF_HOUSE_AZIMUTH): _number(0, 360, 1, "°"),
+    vol.Optional(CONF_HOUSE_WIDTH): _number(1, 500, 0.1, "m"),
+    vol.Optional(CONF_HOUSE_DEPTH): _number(1, 500, 0.1, "m"),
+}
+WALL_FIELD: dict[Any, Any] = {
+    vol.Optional(CONF_WALL): SelectSelector(
+        SelectSelectorConfig(options=list(WALLS), mode=SelectSelectorMode.DROPDOWN)
+    )
+}
+
+OPTION_KEYS = {
+    *DEFAULTS,
+    CONF_OUTDOOR_TEMP,
+    CONF_WEATHER,
+    CONF_WORKDAY,
+    CONF_HOUSE_AZIMUTH,
+    CONF_HOUSE_WIDTH,
+    CONF_HOUSE_DEPTH,
+}
 WINDOW_KEYS = {
     *WINDOW_DEFAULTS,
     CONF_NAME,
@@ -90,8 +123,9 @@ WINDOW_KEYS = {
     CONF_EVENING_EARLIEST,
     CONF_EVENING_ELEVATION,
     CONF_EVENING_LATEST,
+    CONF_WALL,
 }
-GROUP_KEYS = {*GROUP_DEFAULTS, CONF_NAME}
+GROUP_KEYS = {*GROUP_DEFAULTS, CONF_NAME, CONF_WALL}
 
 
 @callback
@@ -159,6 +193,7 @@ def _option_fields(hass: HomeAssistant, values: dict[str, Any]) -> dict[Any, Any
         _startup_schema(values),
     ):
         fields.update(schema.schema)
+    fields.update(HOUSE_FIELDS)
     return fields
 
 
@@ -175,7 +210,7 @@ def _window_fields(
 ) -> dict[Any, Any]:
     """The fields that apply to a window with these values."""
     groups = {sub_id: sub.title for sub_id, sub in _groups(entry).items()}
-    fields = window_basics_fields(values, groups)
+    fields = {**window_basics_fields(values, groups), **WALL_FIELD}
     if group_data is not None:
         fields.update(window_sun_fields(values, group_data))
     options = dict(entry.options)
@@ -206,6 +241,7 @@ def _field_info(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     fields: dict[Any, Any] = {
         **_option_fields(hass, {**DEFAULTS}),
         **_group_schema({}).schema,
+        **WALL_FIELD,
         **_all_window_fields(entry, {**WINDOW_DEFAULTS}),
     }
     return {
@@ -295,7 +331,7 @@ def _save_group(
 ) -> tuple[dict[str, Any], dict[str, str]]:
     values = {**GROUP_DEFAULTS, **current, **incoming}
     values[CONF_NAME] = str(values.get(CONF_NAME) or "").strip()
-    checked, errors = _check(_group_schema(values).schema, values)
+    checked, errors = _check({**_group_schema(values).schema, **WALL_FIELD}, values)
     if errors:
         if errors.get(CONF_NAME) == "required":
             errors[CONF_NAME] = "name_required"

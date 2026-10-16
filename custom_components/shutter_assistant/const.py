@@ -71,6 +71,15 @@ DEFAULTS: Final[dict[str, object]] = {
     CONF_CATCH_UP_AFTER: "12:00:00",
 }
 
+# ---------- house (only in the panel: drawn in the sun compass) ----------
+CONF_HOUSE_AZIMUTH = "house_azimuth"
+CONF_HOUSE_WIDTH = "house_width"
+CONF_HOUSE_DEPTH = "house_depth"
+# Wall of the house a group or window belongs to, by its angle to the front
+# (right and left as seen from inside, looking out of the front).
+CONF_WALL = "wall"
+WALLS: Final = {"front": 0, "right": 90, "back": 180, "left": 270}
+
 # ---------- group (subentry) ----------
 CONF_NAME = "name"
 CONF_AZIMUTH_FROM = "azimuth_from"

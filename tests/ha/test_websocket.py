@@ -285,3 +285,70 @@ async def test_attributes_for_the_panel(hass: HomeAssistant, base_states) -> Non
     await hass.async_block_till_done()
     automatic = hass.states.get("switch.shutter_assistant_automatic")
     assert automatic.attributes["restart_protection_until"] == engine.startup_until.isoformat()
+
+
+async def test_house_and_walls(hass: HomeAssistant, base_states, hass_ws_client) -> None:
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    client = await hass_ws_client(hass)
+
+    msg = await _send(client, type="shutter_assistant/config")
+    fields = msg["result"]["fields"]
+    assert fields["house_width"]["number"]["unit_of_measurement"] == "m"
+    assert fields["wall"]["select"]["options"] == ["front", "right", "back", "left"]
+
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_options",
+        options={"house_azimuth": 175, "house_width": "10.5", "house_depth": 8},
+    )
+    assert "errors" not in msg["result"], msg
+    assert entry.options["house_azimuth"] == 175
+    assert entry.options["house_width"] == 10.5
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_options",
+        options={"house_azimuth": 400, "house_depth": 0},
+    )
+    assert msg["result"]["errors"] == {
+        "house_azimuth": "invalid_value",
+        "house_depth": "invalid_value",
+    }
+    # the house is optional: clearing a value removes it
+    msg = await _send(client, type="shutter_assistant/save_options", options={"house_depth": None})
+    assert "house_depth" not in entry.options
+    assert entry.options["house_width"] == 10.5
+
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_GROUP,
+        subentry_id=GROUP_ID,
+        data={"wall": "front"},
+    )
+    assert msg["success"], msg
+    assert entry.subentries[GROUP_ID].data["wall"] == "front"
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        subentry_id=WINDOW_ID,
+        data={"wall": "nope"},
+    )
+    assert msg["result"]["errors"] == {"wall": "invalid_value"}
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        subentry_id=WINDOW_ID,
+        data={"wall": "left"},
+    )
+    assert entry.subentries[WINDOW_ID].data["wall"] == "left"
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        subentry_id=WINDOW_ID,
+        data={"wall": None},
+    )
+    assert "wall" not in entry.subentries[WINDOW_ID].data
