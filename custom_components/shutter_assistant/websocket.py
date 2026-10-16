@@ -58,6 +58,7 @@ from .const import (
     CONF_OPEN_BLOCK,
     CONF_OUTDOOR_TEMP,
     CONF_WALL,
+    CONF_WALL_POSITION,
     CONF_WEATHER,
     CONF_WINDOW_EXCEPTION,
     CONF_WORKDAY,
@@ -102,6 +103,10 @@ WALL_FIELD: dict[Any, Any] = {
         SelectSelectorConfig(options=list(WALLS), mode=SelectSelectorMode.DROPDOWN)
     )
 }
+WINDOW_WALL_FIELDS: dict[Any, Any] = {
+    **WALL_FIELD,
+    vol.Optional(CONF_WALL_POSITION): _number(1, 50, 1),
+}
 
 OPTION_KEYS = {
     *DEFAULTS,
@@ -124,6 +129,7 @@ WINDOW_KEYS = {
     CONF_EVENING_ELEVATION,
     CONF_EVENING_LATEST,
     CONF_WALL,
+    CONF_WALL_POSITION,
 }
 GROUP_KEYS = {*GROUP_DEFAULTS, CONF_NAME, CONF_WALL}
 
@@ -210,7 +216,7 @@ def _window_fields(
 ) -> dict[Any, Any]:
     """The fields that apply to a window with these values."""
     groups = {sub_id: sub.title for sub_id, sub in _groups(entry).items()}
-    fields = {**window_basics_fields(values, groups), **WALL_FIELD}
+    fields = {**window_basics_fields(values, groups), **WINDOW_WALL_FIELDS}
     if group_data is not None:
         fields.update(window_sun_fields(values, group_data))
     options = dict(entry.options)

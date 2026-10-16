@@ -349,6 +349,22 @@ async def test_house_and_walls(hass: HomeAssistant, base_states, hass_ws_client)
         type="shutter_assistant/save_subentry",
         subentry_type=SUBENTRY_WINDOW,
         subentry_id=WINDOW_ID,
+        data={"wall_position": 2},
+    )
+    assert entry.subentries[WINDOW_ID].data["wall_position"] == 2
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        subentry_id=WINDOW_ID,
+        data={"wall_position": 0},
+    )
+    assert msg["result"]["errors"] == {"wall_position": "invalid_value"}
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        subentry_id=WINDOW_ID,
         data={"wall": None},
     )
     assert "wall" not in entry.subentries[WINDOW_ID].data

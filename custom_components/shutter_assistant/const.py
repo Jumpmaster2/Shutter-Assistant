@@ -79,6 +79,8 @@ CONF_HOUSE_DEPTH = "house_depth"
 # (right and left as seen from inside, looking out of the front).
 CONF_WALL = "wall"
 WALLS: Final = {"front": 0, "right": 90, "back": 180, "left": 270}
+# Order of the windows on their wall, 1 = left as seen from inside.
+CONF_WALL_POSITION = "wall_position"
 
 # ---------- group (subentry) ----------
 CONF_NAME = "name"
