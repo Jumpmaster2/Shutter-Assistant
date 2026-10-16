@@ -7,7 +7,7 @@
 Shutter Assistant ersetzt typische Rollo-Automationen samt ihrer Helfer. Vorgehen:
 
 1. Integration installieren und einrichten (globale Werte wie bisher).
-2. Für jede Himmelsrichtung eine **Gruppe** anlegen (Azimut und Sonnensensoren).
+2. Im Dashboard **Shutter Assistant** (Seitenleiste) für jede Himmelsrichtung eine **Gruppe** anlegen (Azimut und Sonnensensoren).
 3. Für jedes Rollo ein **Fenster** anlegen und die bisherigen Werte eintragen.
 4. Die alten Automationen **ausschalten** (nicht löschen) und ein paar Tage beobachten (Logbuch, Sensor "Letzter Grund").
 5. Danach alte Automationen und Helfer löschen und Dashboards auf die neuen Entitäten umstellen.
@@ -52,7 +52,7 @@ Shutter Assistant ersetzt typische Rollo-Automationen samt ihrer Helfer. Vorgehe
 Shutter Assistant replaces typical cover automations together with their helpers. Steps:
 
 1. Install and set up the integration (global values as before).
-2. Add a **group** for every direction of the sun (azimuth and sun sensors).
+2. In the **Shutter Assistant** dashboard (sidebar) add a **group** for every direction of the sun (azimuth and sun sensors).
 3. Add a **window** for every cover and enter the previous values.
 4. **Disable** (do not delete) the old automations and watch a few days (logbook, sensor "Last reason").
 5. Afterwards delete old automations and helpers and switch dashboards to the new entities.

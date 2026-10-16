@@ -6,12 +6,10 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
-    SOURCE_USER,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
     ConfigSubentryFlow,
-    FlowType,
     OptionsFlow,
     SubentryFlowResult,
 )
@@ -115,6 +113,9 @@ from .const import (
     DOMAIN,
     FREE_STATES_DEFAULT,
     GROUP_DEFAULTS,
+    KIND_LUX,
+    KIND_PV,
+    KIND_RADIATION,
     LANGUAGE_OPTIONS,
     NAME,
     SECTION_CONDITIONS,
@@ -342,17 +343,6 @@ class ShutterConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="evening", data_schema=_evening_schema(user_input or {}), errors=errors
         )
 
-    async def async_on_create_entry(self, result: ConfigFlowResult) -> ConfigFlowResult:
-        """Directly continue with the first group."""
-        entry = result.get("result")
-        if entry is None:
-            return result
-        sub = await self.hass.config_entries.subentries.async_init(
-            (entry.entry_id, SUBENTRY_GROUP), context={"source": SOURCE_USER}
-        )
-        result["next_flow"] = (FlowType.CONFIG_SUBENTRIES_FLOW, sub["flow_id"])
-        return result
-
 
 # ---------------------------------------------------------------- options flow
 
@@ -486,6 +476,162 @@ class GroupSubentryFlow(ConfigSubentryFlow):
         )
 
 
+# ---------------------------------------------------------------- window fields
+# The fields are built by functions so the dialogs and the panel use the same
+# selectors (ranges, units, domains) for showing and for checking values.
+
+SENSOR_UNITS: dict[str, str] = {KIND_PV: "W", KIND_LUX: "lx", KIND_RADIATION: "W/m²"}
+SENSOR_MAXIMA: dict[str, int] = {KIND_PV: 100000, KIND_LUX: 200000, KIND_RADIATION: 1500}
+
+
+def _wreq(key: str, values: dict[str, Any]) -> vol.Required:
+    return vol.Required(key, default=values.get(key, WINDOW_DEFAULTS.get(key)))
+
+
+def window_basics_fields(values: dict[str, Any], groups: dict[str, str]) -> dict[Any, Any]:
+    """Name, cover, contacts and (if there are groups) the group."""
+    fields: dict[Any, Any] = {
+        vol.Required(CONF_NAME, default=values.get(CONF_NAME, "")): TextSelector(),
+        vol.Required(CONF_COVER, default=values.get(CONF_COVER)): _entity(["cover"]),
+        vol.Optional(CONF_WINDOW_SENSORS, default=values.get(CONF_WINDOW_SENSORS, [])): _entity(
+            ["binary_sensor", "input_boolean"], True
+        ),
+    }
+    if groups:
+        options = [SelectOptionDict(value=sub_id, label=title) for sub_id, title in groups.items()]
+        fields[_opt(CONF_GROUP, values)] = SelectSelector(
+            SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN)
+        )
+    return fields
+
+
+def window_sun_fields(values: dict[str, Any], group_data: dict[str, Any]) -> dict[Any, Any]:
+    """Thresholds for the sensor types of the group, hold times, position, auto up."""
+    fields: dict[Any, Any] = {}
+    for kind, sensors_key in SENSOR_KINDS.items():
+        if group_data.get(sensors_key):
+            fields[_wreq(THRESHOLD_KEYS[kind], values)] = _number(
+                0, SENSOR_MAXIMA[kind], 1, SENSOR_UNITS[kind]
+            )
+    fields.update(
+        {
+            _wreq(CONF_TEMP_THRESHOLD, values): _number(-20, 45, 0.5, "°C"),
+            _wreq(CONF_TEMP_HOLD, values): _number(0, 120, 1, "min"),
+            _wreq(CONF_SUN_HOLD, values): _number(0, 120, 1, "min"),
+            _wreq(CONF_SUN_POSITION, values): _number(0, 100, 1, "%"),
+            _wreq(CONF_TOLERANCE, values): _number(0, 50, 1, "%"),
+            _wreq(CONF_AUTO_UP, values): BooleanSelector(),
+            _wreq(CONF_NOTIFY_OPEN, values): BooleanSelector(),
+            _wreq(CONF_MANUAL_MAX, values): _number(0, 100, 1, "%"),
+            _wreq(CONF_MANUAL_WINDOW, values): _number(0, 60, 1, "min"),
+            _wreq(CONF_MANUAL_FOLLOW_UP, values): _number(0, 60, 1, "min"),
+            _wreq(CONF_MANUAL_AT_SUN, values): BooleanSelector(),
+        }
+    )
+    return fields
+
+
+def window_override_fields(values: dict[str, Any]) -> dict[Any, Any]:
+    return {
+        _wreq(CONF_OVERRIDE_DURATION, values): _number(0, 1440, 1, "min"),
+        _wreq(CONF_OVERRIDE_SUNRISE, values): BooleanSelector(),
+        _wreq(CONF_OVERRIDE_IGNORE_EVENING, values): BooleanSelector(),
+    }
+
+
+def window_conditions_fields(values: dict[str, Any]) -> dict[Any, Any]:
+    return {
+        _opt(CONF_OPEN_BLOCK, values): _entity(),
+        vol.Optional(
+            CONF_OPEN_BLOCK_FREE, default=values.get(CONF_OPEN_BLOCK_FREE, FREE_STATES_DEFAULT)
+        ): _states(),
+        vol.Optional(CONF_TRIGGER_ENTITIES, default=values.get(CONF_TRIGGER_ENTITIES, [])): _entity(
+            multiple=True
+        ),
+        vol.Optional(
+            CONF_TRIGGER_ACTIVE, default=values.get(CONF_TRIGGER_ACTIVE, ACTIVE_STATES_DEFAULT)
+        ): _states(),
+        _wreq(CONF_TRIGGER_ON_DELAY, values): _number(0, 600, 1, "s"),
+        _wreq(CONF_TRIGGER_OFF_DELAY, values): _number(0, 600, 1, "s"),
+        _wreq(CONF_TRIGGER_MIN_POSITION, values): _number(0, 100, 1, "%"),
+        _wreq(CONF_TRIGGER_MAX_LOCK, values): _number(1, 48, 1, "h"),
+        _opt(CONF_WINDOW_EXCEPTION, values): _entity(),
+    }
+
+
+def window_evening_fields(values: dict[str, Any], options: dict[str, Any]) -> dict[Any, Any]:
+    """Evening run and own evening times (the global times are the defaults)."""
+    return {
+        _wreq(CONF_EVENING_CLOSE, values): BooleanSelector(),
+        _wreq(CONF_FOLLOW_UP_CLOSE, values): BooleanSelector(),
+        _wreq(CONF_EVENING_CUSTOM, values): BooleanSelector(),
+        **_evening_fields(values, {**DEFAULTS, **options}),
+    }
+
+
+def window_ventilation_fields(values: dict[str, Any]) -> dict[Any, Any]:
+    return {
+        _wreq(CONF_VENTILATION, values): BooleanSelector(),
+        _wreq(CONF_VENT_POSITION, values): _number(0, 100, 1, "%"),
+        _wreq(CONF_CLOSED_POSITION, values): _number(0, 100, 1, "%"),
+        _wreq(CONF_VENT_DELAY_EVENING, values): _number(0, 600, 1, "s"),
+        _wreq(CONF_VENT_DELAY_DAY, values): _number(0, 600, 1, "s"),
+        _wreq(CONF_VACATION, values): BooleanSelector(),
+    }
+
+
+def window_morning_fields(values: dict[str, Any]) -> dict[Any, Any]:
+    return {
+        _wreq(CONF_MORNING, values): BooleanSelector(),
+        _wreq(CONF_MORNING_MODE, values): _choice(MODES, "morning_mode"),
+        _wreq(CONF_MORNING_EARLIEST, values): TimeSelector(),
+        _wreq(CONF_MORNING_LATEST, values): TimeSelector(),
+        _wreq(CONF_MORNING_POSITION, values): _number(0, 100, 1, "%"),
+        _wreq(CONF_MORNING_SUN_POSITION, values): BooleanSelector(),
+    }
+
+
+def window_morning_mode_fields(mode: str, values: dict[str, Any]) -> dict[Any, Any]:
+    """Settings of one morning mode."""
+    if mode == MODE_TIME:
+        return {
+            _wreq(CONF_MORNING_WORKDAY, values): TimeSelector(),
+            _wreq(CONF_MORNING_WEEKEND, values): TimeSelector(),
+        }
+    if mode == MODE_SUN:
+        return {
+            _wreq(CONF_MORNING_SUN_EVENT, values): _choice(
+                [SUN_SUNRISE, SUN_ELEVATION], "morning_sun_event"
+            ),
+            _wreq(CONF_MORNING_SUN_ELEVATION, values): _number(-18, 30, 0.5, "°"),
+            _wreq(CONF_MORNING_SUN_OFFSET, values): _number(-180, 180, 1, "min"),
+        }
+    if mode == MODE_BRIGHTNESS:
+        return {
+            _wreq(CONF_MORNING_LUX, values): _number(0, 200000, 1, "lx"),
+            _wreq(CONF_MORNING_LUX_HOLD, values): _number(0, 120, 1, "min"),
+        }
+    if mode == MODE_TRIGGER:
+        return {
+            vol.Required(CONF_MORNING_TRIGGER, default=values.get(CONF_MORNING_TRIGGER)): _entity(),
+            _wreq(CONF_MORNING_TRIGGER_OFFSET, values): _number(-180, 180, 1, "min"),
+        }
+    return {}
+
+
+def validate_morning(values: dict[str, Any], group_data: dict[str, Any] | None) -> dict[str, str]:
+    """Time window of the morning opening and the brightness sensor for that mode."""
+    if _time_key(values.get(CONF_MORNING_EARLIEST)) > _time_key(values.get(CONF_MORNING_LATEST)):
+        return {CONF_MORNING_LATEST: "latest_before_earliest"}
+    if (
+        values.get(CONF_MORNING)
+        and values.get(CONF_MORNING_MODE) == MODE_BRIGHTNESS
+        and not (group_data or {}).get(CONF_LUX_SENSORS)
+    ):
+        return {CONF_MORNING_MODE: "no_lux_sensor"}
+    return {}
+
+
 # ---------------------------------------------------------------- window subentry
 
 
@@ -511,12 +657,6 @@ class WindowSubentryFlow(ConfigSubentryFlow):
             for sub_id, sub in self._get_entry().subentries.items()
             if sub.subentry_type == SUBENTRY_GROUP
         }
-
-    def _v(self, key: str) -> Any:
-        return self._values.get(key, WINDOW_DEFAULTS.get(key))
-
-    def _req(self, key: str) -> vol.Required:
-        return vol.Required(key, default=self._v(key))
 
     def _finish(self) -> SubentryFlowResult:
         data = _clean({**WINDOW_DEFAULTS, **self._values})
@@ -567,24 +707,10 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 if has_group:
                     return await self.async_step_sun()
                 return await self.async_step_behavior()
-        groups = [
-            SelectOptionDict(value=sub_id, label=sub.title)
-            for sub_id, sub in self._groups().items()
-        ]
-        schema: dict[Any, Any] = {
-            vol.Required(CONF_NAME, default=self._values.get(CONF_NAME, "")): TextSelector(),
-            vol.Required(CONF_COVER, default=self._values.get(CONF_COVER)): _entity(["cover"]),
-            vol.Optional(
-                CONF_WINDOW_SENSORS, default=self._values.get(CONF_WINDOW_SENSORS, [])
-            ): _entity(["binary_sensor", "input_boolean"], True),
-        }
-        if groups:
-            schema[_opt(CONF_GROUP, self._values)] = SelectSelector(
-                SelectSelectorConfig(options=groups, mode=SelectSelectorMode.DROPDOWN)
-            )
+        groups = {sub_id: sub.title for sub_id, sub in self._groups().items()}
         return self.async_show_form(
             step_id="basics",
-            data_schema=vol.Schema(schema),
+            data_schema=vol.Schema(window_basics_fields(self._values, groups)),
             errors=errors,
             last_step=self._reconfigure,
         )
@@ -597,30 +723,9 @@ class WindowSubentryFlow(ConfigSubentryFlow):
             return await self.async_step_behavior()
         group = self._groups().get(self._values.get(CONF_GROUP, ""))
         group_data = {**GROUP_DEFAULTS, **(group.data if group else {})}
-        units = {"pv": "W", "lux": "lx", "radiation": "W/m²"}
-        maxima = {"pv": 100000, "lux": 200000, "radiation": 1500}
-        fields: dict[Any, Any] = {}
-        for kind, sensors_key in SENSOR_KINDS.items():
-            if group_data.get(sensors_key):
-                fields[self._req(THRESHOLD_KEYS[kind])] = _number(0, maxima[kind], 1, units[kind])
-        fields.update(
-            {
-                self._req(CONF_TEMP_THRESHOLD): _number(-20, 45, 0.5, "°C"),
-                self._req(CONF_TEMP_HOLD): _number(0, 120, 1, "min"),
-                self._req(CONF_SUN_HOLD): _number(0, 120, 1, "min"),
-                self._req(CONF_SUN_POSITION): _number(0, 100, 1, "%"),
-                self._req(CONF_TOLERANCE): _number(0, 50, 1, "%"),
-                self._req(CONF_AUTO_UP): BooleanSelector(),
-                self._req(CONF_NOTIFY_OPEN): BooleanSelector(),
-                self._req(CONF_MANUAL_MAX): _number(0, 100, 1, "%"),
-                self._req(CONF_MANUAL_WINDOW): _number(0, 60, 1, "min"),
-                self._req(CONF_MANUAL_FOLLOW_UP): _number(0, 60, 1, "min"),
-                self._req(CONF_MANUAL_AT_SUN): BooleanSelector(),
-            }
-        )
         return self.async_show_form(
             step_id="sun",
-            data_schema=vol.Schema(fields),
+            data_schema=vol.Schema(window_sun_fields(self._values, group_data)),
             description_placeholders={"group": group.title if group else ""},
             last_step=self._reconfigure,
         )
@@ -643,65 +748,20 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 return await self.async_step_morning()
             self._values.update(flat)
         v = self._values
+        options = dict(self._get_entry().options)
         schema = vol.Schema(
             {
                 vol.Required(SECTION_OVERRIDE): section(
-                    vol.Schema(
-                        {
-                            self._req(CONF_OVERRIDE_DURATION): _number(0, 1440, 1, "min"),
-                            self._req(CONF_OVERRIDE_SUNRISE): BooleanSelector(),
-                            self._req(CONF_OVERRIDE_IGNORE_EVENING): BooleanSelector(),
-                        }
-                    ),
-                    {"collapsed": False},
+                    vol.Schema(window_override_fields(v)), {"collapsed": False}
                 ),
                 vol.Required(SECTION_CONDITIONS): section(
-                    vol.Schema(
-                        {
-                            _opt(CONF_OPEN_BLOCK, v): _entity(),
-                            vol.Optional(
-                                CONF_OPEN_BLOCK_FREE,
-                                default=v.get(CONF_OPEN_BLOCK_FREE, FREE_STATES_DEFAULT),
-                            ): _states(),
-                            vol.Optional(
-                                CONF_TRIGGER_ENTITIES, default=v.get(CONF_TRIGGER_ENTITIES, [])
-                            ): _entity(multiple=True),
-                            vol.Optional(
-                                CONF_TRIGGER_ACTIVE,
-                                default=v.get(CONF_TRIGGER_ACTIVE, ACTIVE_STATES_DEFAULT),
-                            ): _states(),
-                            self._req(CONF_TRIGGER_ON_DELAY): _number(0, 600, 1, "s"),
-                            self._req(CONF_TRIGGER_OFF_DELAY): _number(0, 600, 1, "s"),
-                            self._req(CONF_TRIGGER_MIN_POSITION): _number(0, 100, 1, "%"),
-                            self._req(CONF_TRIGGER_MAX_LOCK): _number(1, 48, 1, "h"),
-                            _opt(CONF_WINDOW_EXCEPTION, v): _entity(),
-                        }
-                    ),
-                    {"collapsed": True},
+                    vol.Schema(window_conditions_fields(v)), {"collapsed": True}
                 ),
                 vol.Required(SECTION_EVENING): section(
-                    vol.Schema(
-                        {
-                            self._req(CONF_EVENING_CLOSE): BooleanSelector(),
-                            self._req(CONF_FOLLOW_UP_CLOSE): BooleanSelector(),
-                            self._req(CONF_EVENING_CUSTOM): BooleanSelector(),
-                            **_evening_fields(v, {**DEFAULTS, **self._get_entry().options}),
-                        }
-                    ),
-                    {"collapsed": True},
+                    vol.Schema(window_evening_fields(v, options)), {"collapsed": True}
                 ),
                 vol.Required(SECTION_VENTILATION): section(
-                    vol.Schema(
-                        {
-                            self._req(CONF_VENTILATION): BooleanSelector(),
-                            self._req(CONF_VENT_POSITION): _number(0, 100, 1, "%"),
-                            self._req(CONF_CLOSED_POSITION): _number(0, 100, 1, "%"),
-                            self._req(CONF_VENT_DELAY_EVENING): _number(0, 600, 1, "s"),
-                            self._req(CONF_VENT_DELAY_DAY): _number(0, 600, 1, "s"),
-                            self._req(CONF_VACATION): BooleanSelector(),
-                        }
-                    ),
-                    {"collapsed": True},
+                    vol.Schema(window_ventilation_fields(v)), {"collapsed": True}
                 ),
             }
         )
@@ -715,93 +775,47 @@ class WindowSubentryFlow(ConfigSubentryFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             group = self._groups().get(self._values.get(CONF_GROUP, ""))
-            if _time_key(user_input.get(CONF_MORNING_EARLIEST)) > _time_key(
-                user_input.get(CONF_MORNING_LATEST)
-            ):
-                errors[CONF_MORNING_LATEST] = "latest_before_earliest"
-            elif (
-                user_input.get(CONF_MORNING)
-                and user_input.get(CONF_MORNING_MODE) == MODE_BRIGHTNESS
-                and (group is None or not group.data.get(CONF_LUX_SENSORS))
-            ):
-                errors[CONF_MORNING_MODE] = "no_lux_sensor"
-            else:
+            errors = validate_morning(user_input, dict(group.data) if group else None)
+            if not errors:
                 self._values.update(user_input)
                 if not user_input.get(CONF_MORNING):
                     return self._finish()
                 step = MORNING_STEPS[str(user_input[CONF_MORNING_MODE])]
                 return await getattr(self, f"async_step_{step}")()
-        schema = vol.Schema(
-            {
-                self._req(CONF_MORNING): BooleanSelector(),
-                self._req(CONF_MORNING_MODE): _choice(MODES, "morning_mode"),
-                self._req(CONF_MORNING_EARLIEST): TimeSelector(),
-                self._req(CONF_MORNING_LATEST): TimeSelector(),
-                self._req(CONF_MORNING_POSITION): _number(0, 100, 1, "%"),
-                self._req(CONF_MORNING_SUN_POSITION): BooleanSelector(),
-            }
+        return self.async_show_form(
+            step_id="morning",
+            data_schema=vol.Schema(window_morning_fields(self._values)),
+            errors=errors,
         )
-        return self.async_show_form(step_id="morning", data_schema=schema, errors=errors)
+
+    async def _async_morning_mode(
+        self, mode: str, user_input: dict[str, Any] | None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
+            self._values.update(user_input)
+            return self._finish()
+        return self.async_show_form(
+            step_id=MORNING_STEPS[mode],
+            data_schema=vol.Schema(window_morning_mode_fields(mode, self._values)),
+            last_step=True,
+        )
 
     async def async_step_morning_time(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        if user_input is not None:
-            self._values.update(user_input)
-            return self._finish()
-        schema = vol.Schema(
-            {
-                self._req(CONF_MORNING_WORKDAY): TimeSelector(),
-                self._req(CONF_MORNING_WEEKEND): TimeSelector(),
-            }
-        )
-        return self.async_show_form(step_id="morning_time", data_schema=schema, last_step=True)
+        return await self._async_morning_mode(MODE_TIME, user_input)
 
     async def async_step_morning_sun(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        if user_input is not None:
-            self._values.update(user_input)
-            return self._finish()
-        schema = vol.Schema(
-            {
-                self._req(CONF_MORNING_SUN_EVENT): _choice(
-                    [SUN_SUNRISE, SUN_ELEVATION], "morning_sun_event"
-                ),
-                self._req(CONF_MORNING_SUN_ELEVATION): _number(-18, 30, 0.5, "°"),
-                self._req(CONF_MORNING_SUN_OFFSET): _number(-180, 180, 1, "min"),
-            }
-        )
-        return self.async_show_form(step_id="morning_sun", data_schema=schema, last_step=True)
+        return await self._async_morning_mode(MODE_SUN, user_input)
 
     async def async_step_morning_brightness(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        if user_input is not None:
-            self._values.update(user_input)
-            return self._finish()
-        schema = vol.Schema(
-            {
-                self._req(CONF_MORNING_LUX): _number(0, 200000, 1, "lx"),
-                self._req(CONF_MORNING_LUX_HOLD): _number(0, 120, 1, "min"),
-            }
-        )
-        return self.async_show_form(
-            step_id="morning_brightness", data_schema=schema, last_step=True
-        )
+        return await self._async_morning_mode(MODE_BRIGHTNESS, user_input)
 
     async def async_step_morning_trigger(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        if user_input is not None:
-            self._values.update(user_input)
-            return self._finish()
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_MORNING_TRIGGER, default=self._values.get(CONF_MORNING_TRIGGER)
-                ): _entity(),
-                self._req(CONF_MORNING_TRIGGER_OFFSET): _number(-180, 180, 1, "min"),
-            }
-        )
-        return self.async_show_form(step_id="morning_trigger", data_schema=schema, last_step=True)
+        return await self._async_morning_mode(MODE_TRIGGER, user_input)

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Shutter Assistant",
-        "description": "Global sensors. Groups (sun directions) and windows are added afterwards.",
+        "description": "Global sensors. Groups (sun directions) and windows are added afterwards in the Shutter Assistant dashboard (sidebar).",
         "data": {
           "outdoor_temperature": "Outdoor temperature sensor",
           "weather": "Weather entity",

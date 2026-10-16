@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.1.3.
+> Status: version 0.2.0.
 
 ## How it works
 
@@ -60,10 +60,22 @@ After Home Assistant started there are no movements for some minutes (default 5)
 2. Add the repository `https://github.com/Jumpmaster2/Shutter-Assistant`, type **Integration**.
 3. Download **Shutter Assistant** and restart Home Assistant.
 4. **Settings > Devices & services > Add integration > Shutter Assistant**.
+5. Add groups and windows in the **Shutter Assistant** dashboard (sidebar).
 
 Requires Home Assistant 2026.10 or newer.
 
 ## Configuration
+
+### Dashboard
+
+After the setup there is a **Shutter Assistant** page in the sidebar (administrators only). **Configure** at the integration (Devices & services) opens this page directly.
+
+* **Overview:** automatic on/off, summer day (forecast and threshold), start of the evening mode, vacation and restart protection. Next to it the **sun compass** with the current position of the sun and the sectors of the groups, notes (e.g. configured entities that do not exist, or a deleted group) and all windows with status, position, window contact and last reason. A running override can be **ended** right there. The **sun condition check** shows every part of the condition per window with the current value and threshold: summer day, outdoor temperature, every sun sensor, hold time (with the time it will be met) and whether the sun is in the sector.
+* **Windows:** all windows as a table, click to edit. The editor shows the settings by topic in cards (window, sun protection, detect manual sun protection, evening, override, ventilation & vacation, morning opening, additional conditions). Only the fields that apply are shown: thresholds only for the sensor types of the group, own evening times only when switched on, for the morning opening only the fields of the chosen mode. **Duplicate** creates a new window with the same settings; only cover and window contacts are chosen again.
+* **Groups:** directions of the sun with the current values of their sensors and the windows using them. While editing, the compass shows the sector of the group right away.
+* **General** and **Evening & vacation:** the global settings in cards, each card is saved on its own.
+
+Values are checked exactly like in the dialogs (same ranges, units and rules). The dialogs (options, add or change group and window) are still available.
 
 ### Setup and options (global)
 
@@ -101,7 +113,7 @@ Requires Home Assistant 2026.10 or newer.
 
 Positions: 100 % = open, 0 % = closed.
 
-**Changing:** gear icon of the window, then choose the category (window, sun protection, behaviour, morning opening). Each category is saved on its own, the others stay unchanged.
+**Changing:** in the dashboard or with the gear icon of the window, then choose the category (window, sun protection, behaviour, morning opening). Each category is saved on its own, the others stay unchanged.
 
 ## Entities
 
@@ -117,7 +129,7 @@ Per window (own device):
 * Sensor **Last reason** (text, code, position, time)
 * Binary sensors **Manual override** (with end), **Sun condition** (with partial conditions), **Sun protection today**, **Closed this evening**
 
-For control cards on a dashboard, **Sun condition** (thresholds, sensors, azimuth sector, hold times and when they end) and **Status** (cover, window contacts, evening start, override end) provide all values as attributes.
+For control cards on a dashboard, **Sun condition** (thresholds, sensors, azimuth sector, hold times and when they end) and **Status** (cover, window contacts, evening start, override end) provide all values as attributes. **Evening mode** has the start and end of the current or next evening, **Automatic** the end of a running restart protection.
 
 Every movement and every override is written to the **logbook** with its reason.
 
@@ -131,6 +143,8 @@ See [docs/migration.md](docs/migration.md).
 pip install -r requirements_test.txt
 pytest
 ```
+
+The labels of the dashboard (`frontend/labels.js`) are generated from the translations: after changing `translations/*.json` run `python scripts/gen_labels.py` once (a test checks this).
 
 The rules in `custom_components/shutter_assistant/logic/` do not depend on Home Assistant and can be tested on their own. The tests with Home Assistant need Linux or macOS (they also run in GitHub Actions).
 

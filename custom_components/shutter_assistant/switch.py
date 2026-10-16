@@ -7,6 +7,7 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .engine import ShutterConfigEntry, ShutterEngine
 from .entity import GlobalEntity
@@ -31,6 +32,15 @@ class AutomaticSwitch(GlobalEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         return self.coordinator.automatic
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        until = self.coordinator.startup_until
+        return {
+            "restart_protection_until": (
+                until.isoformat() if until and until > dt_util.now() else None
+            )
+        }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_automatic(True)
