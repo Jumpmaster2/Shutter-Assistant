@@ -7,7 +7,19 @@ from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from custom_components.shutter_assistant.const import SUBENTRY_GROUP, SUBENTRY_WINDOW
+from custom_components.shutter_assistant.const import (
+    DEFAULTS,
+    SUBENTRY_GROUP,
+    SUBENTRY_WINDOW,
+    WINDOW_DEFAULTS,
+)
+from custom_components.shutter_assistant.websocket import (
+    OPTION_KEYS,
+    WINDOW_KEYS,
+    _all_window_fields,
+    _key,
+    _option_fields,
+)
 
 from .conftest import COVER, GROUP_ID, OUTDOOR, PV, TV, WINDOW_ID, make_entry, setup_entry
 
@@ -103,6 +115,64 @@ async def test_save_options(hass: HomeAssistant, base_states, hass_ws_client) ->
 
     msg = await _send(client, type="shutter_assistant/save_options", options={"nope": 1})
     assert not msg["success"]
+
+
+async def test_every_field_can_be_saved(hass: HomeAssistant, base_states) -> None:
+    """Every field the panel shows is accepted when saving."""
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    options = {_key(m) for m in _option_fields(hass, {**DEFAULTS})}
+    windows = {_key(m) for m in _all_window_fields(entry, {**WINDOW_DEFAULTS})}
+    assert options - OPTION_KEYS == set()
+    assert windows - WINDOW_KEYS == set()
+
+
+async def test_save_heat_need_entities(hass: HomeAssistant, base_states, hass_ws_client) -> None:
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    hass.states.async_set("binary_sensor.heating_day", "off")
+    hass.states.async_set("climate.living_room", "heat")
+    hass.states.async_set("climate.living_room_ac", "off")
+    client = await hass_ws_client(hass)
+
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_options",
+        options={"heating_entity": "binary_sensor.heating_day", "night_threshold": 15},
+    )
+    assert msg["success"], msg
+    assert "errors" not in msg["result"]
+    assert entry.options["heating_entity"] == "binary_sensor.heating_day"
+    assert entry.options["night_threshold"] == 15
+
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        subentry_id=WINDOW_ID,
+        data={"room_entity": "climate.living_room", "cooling_entity": "climate.living_room_ac"},
+    )
+    assert msg["success"], msg
+    assert "errors" not in msg["result"]
+    data = entry.subentries[WINDOW_ID].data
+    assert data["room_entity"] == "climate.living_room"
+    assert data["cooling_entity"] == "climate.living_room_ac"
+    assert data["cover"] == COVER
+
+    # cleared again
+    msg = await _send(
+        client, type="shutter_assistant/save_options", options={"heating_entity": None}
+    )
+    assert "heating_entity" not in entry.options
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        subentry_id=WINDOW_ID,
+        data={"cooling_entity": None},
+    )
+    assert "cooling_entity" not in entry.subentries[WINDOW_ID].data
+    assert entry.subentries[WINDOW_ID].data["room_entity"] == "climate.living_room"
 
 
 async def test_save_group(hass: HomeAssistant, base_states, hass_ws_client) -> None:
