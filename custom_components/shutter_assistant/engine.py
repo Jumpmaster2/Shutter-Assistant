@@ -647,6 +647,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             self.vacation_evening_day == self._evening_day(now)
         )
 
+    def global_evening_times(self) -> tuple[datetime, datetime]:
+        """Start and end of the current (or next) evening with the global settings."""
+        return self._evening_window(self.global_evening, self._evening_day(dt_util.now()))
+
     def _startup(self, now: datetime) -> bool:
         return self.startup_until is not None and now < self.startup_until
 
@@ -1161,6 +1165,15 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self._refresh(win, now)
         self._evaluate(win, now)
         self.async_update_listeners()
+
+    @callback
+    def end_override(self, window_id: str) -> bool:
+        """End a running override by hand (panel). False if none is running."""
+        win = self.windows.get(window_id)
+        if win is None or not win.override_active:
+            return False
+        self._end_override(window_id, dt_util.now())
+        return True
 
     # ------------------------------------------------------------------ open block and exception
 

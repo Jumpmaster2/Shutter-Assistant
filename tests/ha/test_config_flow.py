@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER, FlowType
+from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
@@ -42,7 +42,8 @@ async def test_user_flow(hass: HomeAssistant, base_states) -> None:
     entry = result["result"]
     assert entry.options["outdoor_temperature"] == OUTDOOR
     assert entry.options["vacation_morning_start"] == "07:00:00"
-    assert result["next_flow"][0] == FlowType.CONFIG_SUBENTRIES_FLOW
+    # groups and windows are added in the panel afterwards
+    assert "next_flow" not in result
 
 
 async def test_options_flow(hass: HomeAssistant, base_states) -> None:

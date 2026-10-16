@@ -6,7 +6,7 @@ Custom Integration für Home Assistant, die Rollos und Raffstores automatisch st
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.1.3.
+> Status: Version 0.2.0.
 
 ## Funktionsweise
 
@@ -60,10 +60,22 @@ Nach dem Start von Home Assistant gibt es einige Minuten (Standard 5) keine Fahr
 2. Repository `https://github.com/Jumpmaster2/Shutter-Assistant`, Typ **Integration**, hinzufügen.
 3. **Shutter Assistant** herunterladen und Home Assistant neu starten.
 4. **Einstellungen > Geräte & Dienste > Integration hinzufügen > Shutter Assistant**.
+5. Gruppen und Fenster im Dashboard **Shutter Assistant** (Seitenleiste) anlegen.
 
 Voraussetzung: Home Assistant 2026.10 oder neuer.
 
 ## Konfiguration
+
+### Dashboard
+
+Nach der Einrichtung gibt es in der Seitenleiste die Seite **Shutter Assistant** (nur für Administratoren). **Einstellungen** bei der Integration (Geräte & Dienste) öffnet direkt diese Seite.
+
+* **Übersicht:** Automatik an/aus, Sommertag (Vorhersage und Schwelle), Beginn des Abendmodus, Urlaub und Neustart-Schutz. Dazu der **Sonnenkompass** mit dem aktuellen Sonnenstand und den Bereichen der Gruppen, Hinweise (z. B. eingestellte Entitäten, die es nicht gibt, oder eine gelöschte Gruppe) und alle Fenster mit Status, Position, Fensterkontakt und letztem Grund. Eine laufende Übersteuerung lässt sich direkt **beenden**. Der **Sonnenbedingung-Check** zeigt je Fenster jede Teilbedingung mit aktuellem Wert und Schwelle: Sommertag, Außentemperatur, jeder Sonnensensor, Haltezeit (mit Uhrzeit, ab wann sie erfüllt ist) und ob die Sonne im Bereich steht.
+* **Fenster:** alle Fenster als Tabelle, anklicken zum Bearbeiten. Der Editor zeigt die Einstellungen nach Themen in Karten (Fenster, Sonnenschutz, Manuellen Sonnenschutz erkennen, Abend, Übersteuerung, Lüften & Urlaub, Morgenöffnung, Zusatzbedingungen). Es erscheinen nur die Felder, die gerade gelten: Schwellen nur für die Sensortypen der Gruppe, eigene Abendzeiten nur wenn eingeschaltet, bei der Morgenöffnung nur die Felder des gewählten Modus. **Duplizieren** legt ein neues Fenster mit denselben Einstellungen an, nur Rollo und Fensterkontakte werden neu gewählt.
+* **Gruppen:** Himmelsrichtungen mit den aktuellen Werten ihrer Sensoren und den Fenstern, die sie verwenden. Beim Bearbeiten zeigt der Kompass den Bereich der Gruppe sofort an.
+* **Allgemein** und **Abend & Urlaub:** die globalen Einstellungen in Karten, jede Karte wird für sich gespeichert.
+
+Die Werte werden genauso geprüft wie in den Dialogen (gleiche Bereiche, Einheiten und Regeln). Die Dialoge (Optionen, Gruppe und Fenster hinzufügen oder ändern) gibt es weiterhin.
 
 ### Einrichtung und Optionen (global)
 
@@ -101,7 +113,7 @@ Voraussetzung: Home Assistant 2026.10 oder neuer.
 
 Positionen: 100 % = offen, 0 % = zu.
 
-**Ändern:** Zahnrad beim Fenster, dann die Kategorie wählen (Fenster, Sonnenschutz, Verhalten, Morgenöffnung). Jede Kategorie wird für sich gespeichert, die anderen bleiben unverändert.
+**Ändern:** im Dashboard oder über das Zahnrad beim Fenster, dann die Kategorie wählen (Fenster, Sonnenschutz, Verhalten, Morgenöffnung). Jede Kategorie wird für sich gespeichert, die anderen bleiben unverändert.
 
 ## Entitäten
 
@@ -117,7 +129,7 @@ Je Fenster (eigenes Gerät):
 * Sensor **Letzter Grund** (Text, Code, Position, Zeit)
 * Binärsensoren **Manuelle Übersteuerung** (mit Ende), **Sonnenbedingung** (mit Teilbedingungen), **Sonnenschutz heute**, **Abends geschlossen**
 
-Für Kontroll-Karten im Dashboard liefern **Sonnenbedingung** (Schwellen, Sensoren, Azimut-Bereich, Haltezeiten und wann sie ablaufen) und **Status** (Rollo, Fensterkontakte, Abendbeginn, Übersteuerung bis) alle Werte als Attribute.
+Für Kontroll-Karten im Dashboard liefern **Sonnenbedingung** (Schwellen, Sensoren, Azimut-Bereich, Haltezeiten und wann sie ablaufen) und **Status** (Rollo, Fensterkontakte, Abendbeginn, Übersteuerung bis) alle Werte als Attribute. **Abendmodus** hat Beginn und Ende des aktuellen oder nächsten Abends, **Automatik** das Ende eines laufenden Neustart-Schutzes.
 
 Jede Fahrt und jede Übersteuerung steht mit Grund im **Logbuch**.
 
@@ -131,6 +143,8 @@ Siehe [docs/migration.md](docs/migration.md).
 pip install -r requirements_test.txt
 pytest
 ```
+
+Die Beschriftungen des Dashboards (`frontend/labels.js`) werden aus den Übersetzungen erzeugt: nach einer Änderung an `translations/*.json` einmal `python scripts/gen_labels.py` ausführen (ein Test prüft das).
 
 Die Regeln in `custom_components/shutter_assistant/logic/` haben keine Abhängigkeit zu Home Assistant und sind einzeln testbar. Die Tests mit Home Assistant brauchen Linux oder macOS (sie laufen auch in GitHub Actions).
 

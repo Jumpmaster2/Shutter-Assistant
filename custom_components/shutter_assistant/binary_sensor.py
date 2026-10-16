@@ -65,6 +65,11 @@ class EveningMode(GlobalEntity, BinarySensorEntity):
     def is_on(self) -> bool:
         return self.coordinator.global_evening_active
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        start, end = self.coordinator.global_evening_times()
+        return {"start": start.isoformat(), "end": end.isoformat()}
+
 
 class Override(WindowEntity, BinarySensorEntity):
     """Manual override active."""

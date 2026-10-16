@@ -1,6 +1,7 @@
 {
   "domain": "shutter_assistant",
   "name": "Shutter Assistant",
+  "after_dependencies": ["frontend", "http", "panel_custom", "websocket_api"],
   "codeowners": ["@Jumpmaster2"],
   "config_flow": true,
   "documentation": "https://github.com/Jumpmaster2/Shutter-Assistant",
@@ -9,5 +10,5 @@
   "issue_tracker": "https://github.com/Jumpmaster2/Shutter-Assistant/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.1.3"
+  "version": "0.2.0"
 }

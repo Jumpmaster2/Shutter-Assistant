@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Shutter Assistant",
-        "description": "Globale Sensoren. Gruppen (Himmelsrichtungen) und Fenster folgen danach.",
+        "description": "Globale Sensoren. Gruppen (Himmelsrichtungen) und Fenster werden danach im Dashboard „Shutter Assistant“ (Seitenleiste) angelegt.",
         "data": {
           "outdoor_temperature": "Außentemperatur-Sensor",
           "weather": "Wetter-Entität",
