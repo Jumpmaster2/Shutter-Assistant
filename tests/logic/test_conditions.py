@@ -126,6 +126,22 @@ def test_cooling_active() -> None:
     assert not cooling_active(None, None)
 
 
+def test_cooling_without_action_in_auto_mode() -> None:
+    # e.g. Midea: no hvac_action, auto cools while the room is above the target
+    assert cooling_active("auto", None, 25.0, 23.0)
+    assert cooling_active("heat_cool", None, 25.0, 23.0)
+    assert not cooling_active("auto", None, 23.0, 23.0)
+    assert not cooling_active("auto", None, None, 23.0)
+    assert not cooling_active("auto", None, 25.0, None)
+    # a reported action wins over the temperatures
+    assert not cooling_active("auto", "idle", 25.0, 23.0)
+    assert not cooling_active("auto", "heating", 25.0, 23.0)
+    # other modes do not cool
+    assert not cooling_active("dry", None, 25.0, 23.0)
+    assert not cooling_active("fan_only", None, 25.0, 23.0)
+    assert not cooling_active("unavailable", None, 25.0, 23.0)
+
+
 def test_heat_need() -> None:
     # no room entity: as before, except on a heating day
     assert heat_need(None, False, False)

@@ -717,6 +717,46 @@ async def test_night_low_falls_back_to_today_and_is_restored(
     assert stored["forecast_night_low"] == 8.0
 
 
+async def test_forecast_without_night_low_is_fetched_again_at_start(
+    hass: HomeAssistant, base_states, calls, hass_storage, freezer: FrozenDateTimeFactory
+) -> None:
+    # stored by 0.2.x in the night: today's forecast, but no night low
+    freezer.move_to(AUTUMN_AFTERNOON)
+    entry = make_entry(weather="weather.home")
+    hass_storage[f"shutter_assistant.{entry.entry_id}"] = {
+        "version": 1,
+        "key": f"shutter_assistant.{entry.entry_id}",
+        "data": {"forecast_day": "2026-10-16", "forecast_max": 19.4},
+    }
+    # in the afternoon the service reports only the high of the remaining hours
+    _forecast_service(hass, 17.0, 9.0)
+    await setup_entry(hass, entry)
+    engine = entry.runtime_data
+    assert engine.forecast_night_low == 9.0
+    assert engine.forecast_max == 19.4
+    hass.states.async_set(OUTDOOR, "24.5")
+    await hass.async_block_till_done()
+    assert hass.states.get(SUMMER).state == "off"
+    await advance(hass, freezer, 20 * 60)
+    assert calls["set_cover_position"] == []
+
+
+async def test_air_conditioner_without_action_cools_in_auto_mode(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    _room(hass, 21.0)
+    hass.states.async_set(
+        AIR_CONDITIONER, "auto", {"current_temperature": 25.0, "temperature": 23.0}
+    )
+    await _summer_noon(
+        hass, freezer, window={"room_entity": ROOM, "cooling_entity": AIR_CONDITIONER}
+    )
+    await advance(hass, freezer, 15 * 60)
+    assert [c.data["position"] for c in calls["set_cover_position"]] == [10]
+    engine = hass.config_entries.async_entries("shutter_assistant")[0].runtime_data
+    assert engine.sun_details(engine.windows[WINDOW_ID])["cooling"] is True
+
+
 def _room(hass: HomeAssistant, current: float, setpoint: float = 21.0) -> None:
     hass.states.async_set(ROOM, "heat", {"current_temperature": current, "temperature": setpoint})
 

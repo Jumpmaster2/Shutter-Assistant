@@ -406,8 +406,12 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 self._evaluate(win, now)
 
     async def _async_started(self, _hass: HomeAssistant) -> None:
-        """Home Assistant is running: get the forecast if today's is missing."""
-        if self.forecast_day != self._sun_day(dt_util.now()):
+        """Home Assistant is running: get the forecast if today's is missing.
+
+        Also without a night low (e.g. stored by a version before 0.3.0), so the
+        warm night check applies today and not only after the next day change.
+        """
+        if self.forecast_day != self._sun_day(dt_util.now()) or self.forecast_night_low is None:
             await self.async_update_forecast()
 
     def _restore(self, stored: dict[str, Any]) -> None:
@@ -789,7 +793,12 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         state = self._state(win.conf.get(CONF_COOLING_ENTITY))
         if state is None:
             return False
-        return cooling_active(state.state, state.attributes.get("hvac_action"))
+        return cooling_active(
+            state.state,
+            state.attributes.get("hvac_action"),
+            as_float(state.attributes.get("current_temperature")),
+            as_float(state.attributes.get("temperature")),
+        )
 
     def _heat_need(self, win: Window) -> bool:
         return heat_need(self.room_warm(win), self.cooling(win), self.heating_day)
@@ -1422,7 +1431,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 lambda _now: self.hass.async_create_task(self.async_update_forecast()),
             )
         else:
-            self.forecast_max = value
+            # A later fetch on the same day only adds the night low: during the day
+            # some services report only the high of the remaining hours.
+            if self.forecast_day != self._sun_day(now) or self.forecast_max is None:
+                self.forecast_max = value
             self.forecast_night_low = night_low
             self.forecast_day = self._sun_day(now)
             self._cancel("forecast_retry")
