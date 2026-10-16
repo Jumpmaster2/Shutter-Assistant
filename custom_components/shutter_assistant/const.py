@@ -48,6 +48,13 @@ CONF_VAC_EVENING_WINDOW = "vacation_evening_window"
 CONF_STARTUP_DELAY = "startup_delay"
 CONF_CATCH_UP_AFTER = "catch_up_after"
 
+# When a manual command starts an override: only after a real movement, or
+# with every command (also when the cover is already at its target).
+CONF_OVERRIDE_TRIGGER = "override_trigger"
+TRIGGER_MOVEMENT = "movement"
+TRIGGER_COMMAND = "command"
+OVERRIDE_TRIGGERS: Final = [TRIGGER_MOVEMENT, TRIGGER_COMMAND]
+
 LANGUAGE_OPTIONS: Final = ["auto", "de", "en"]
 
 DEFAULTS: Final[dict[str, object]] = {
@@ -69,6 +76,7 @@ DEFAULTS: Final[dict[str, object]] = {
     CONF_VAC_EVENING_WINDOW: 90,
     CONF_STARTUP_DELAY: 5,
     CONF_CATCH_UP_AFTER: "12:00:00",
+    CONF_OVERRIDE_TRIGGER: TRIGGER_MOVEMENT,
 }
 
 # ---------- house (only in the panel: drawn in the sun compass) ----------

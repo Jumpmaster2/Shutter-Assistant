@@ -213,6 +213,10 @@ export const LABELS = {
    "Auch bei Sonnenaufgang beenden",
    ""
   ],
+  "override_trigger": [
+   "Übersteuerung beginnt",
+   "Nur bei echter Fahrt: Ein Befehl an ein Rollo, das schon in der Zielposition steht (z. B. „alle Rollos auf“, während es offen ist), startet keine Übersteuerung. Jeder Befehl: auch ohne Fahrt, wie bisher."
+  ],
   "position_tolerance": [
    "Toleranz für Auto-Hoch",
    "Auto-Hoch öffnet nur Rollos, die auf der Sonnenschutz-Position bis so viel darüber stehen. Von Hand anders gestellte Rollos bleiben."
@@ -535,6 +539,10 @@ export const LABELS = {
    "Also end at sunrise",
    ""
   ],
+  "override_trigger": [
+   "Override starts",
+   "Only with a real movement: a command to a cover already at its target (e.g. \"open all\" while it is open) does not start an override. Every command: also without movement, as before."
+  ],
   "position_tolerance": [
    "Tolerance for auto up",
    "Auto up only opens covers standing at the sun protection position up to this much above it. Covers moved elsewhere by hand stay."
@@ -661,6 +669,10 @@ export const CHOICES = {
   "morning_sun_event": {
    "sunrise": "Sonnenaufgang",
    "elevation": "Sonnenhöhe"
+  },
+  "override_trigger": {
+   "movement": "Nur wenn das Rollo wirklich fährt",
+   "command": "Bei jedem Befehl von Hand, auch ohne Fahrt"
   }
  },
  "en": {
@@ -678,6 +690,10 @@ export const CHOICES = {
   "morning_sun_event": {
    "sunrise": "Sunrise",
    "elevation": "Sun elevation"
+  },
+  "override_trigger": {
+   "movement": "Only when the cover really moves",
+   "command": "With every command by hand, also without movement"
   }
  }
 };

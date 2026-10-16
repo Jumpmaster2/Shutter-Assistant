@@ -46,6 +46,8 @@ async def test_config(hass: HomeAssistant, base_states, hass_ws_client) -> None:
     for key in ("morning_trigger_entity", "morning_lux_threshold", "lux_threshold"):
         assert key in fields
     assert fields["language"]["select"]["translation_key"] == "language"
+    assert fields["override_trigger"]["select"]["options"] == ["movement", "command"]
+    assert cfg["options"]["override_trigger"] == "movement"
 
 
 async def test_save_options(hass: HomeAssistant, base_states, hass_ws_client) -> None:
@@ -89,6 +91,15 @@ async def test_save_options(hass: HomeAssistant, base_states, hass_ws_client) ->
         "weather": "invalid_value",
     }
     assert entry.options["summer_threshold"] == 25
+
+    msg = await _send(
+        client, type="shutter_assistant/save_options", options={"override_trigger": "sometimes"}
+    )
+    assert msg["result"]["errors"] == {"override_trigger": "invalid_value"}
+    msg = await _send(
+        client, type="shutter_assistant/save_options", options={"override_trigger": "command"}
+    )
+    assert entry.options["override_trigger"] == "command"
 
     msg = await _send(client, type="shutter_assistant/save_options", options={"nope": 1})
     assert not msg["success"]

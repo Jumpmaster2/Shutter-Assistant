@@ -143,7 +143,7 @@ async def test_auto_up_waits_for_the_override(
     await advance(hass, freezer, 60)
     # manual movement and back to the sun position: override for 60 min
     set_cover(hass, 10, state="opening")
-    set_cover(hass, 12)
+    set_cover(hass, 20)
     await hass.async_block_till_done()
     set_cover(hass, 10, state="closing")
     set_cover(hass, 10)
@@ -173,13 +173,43 @@ async def test_manual_movement_is_detected_but_own_is_not(
     assert hass.states.get(OVERRIDE).state == "off"
     set_cover(hass, 50)
     await hass.async_block_till_done()
-    # a real manual movement from standstill
+    # a real manual movement from standstill (counts once the position changes)
     set_cover(hass, 50, state="closing")
+    await hass.async_block_till_done()
+    assert hass.states.get(OVERRIDE).state == "off"
+    set_cover(hass, 40, state="closing")
     await hass.async_block_till_done()
     assert hass.states.get(OVERRIDE).state == "on"
     assert hass.states.get(STATUS).state == "override"
     await advance(hass, freezer, 61 * 60)
     assert hass.states.get(OVERRIDE).state == "off"
+
+
+async def test_command_without_movement_starts_no_override(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-10-15 10:00:00+02:00")
+    await setup_entry(hass, make_entry())
+    # "open all covers" while it is open: opening and open again without moving
+    set_cover(hass, 100, state="opening", context=Context(user_id="voice"))
+    set_cover(hass, 100, context=Context(user_id="voice"))
+    await hass.async_block_till_done()
+    assert hass.states.get(OVERRIDE).state == "off"
+    # a command that really moves the cover
+    set_cover(hass, 100, state="closing")
+    set_cover(hass, 70, state="closing")
+    await hass.async_block_till_done()
+    assert hass.states.get(OVERRIDE).state == "on"
+
+
+async def test_every_command_starts_an_override_when_chosen(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-10-15 10:00:00+02:00")
+    await setup_entry(hass, make_entry(override_trigger="command"))
+    set_cover(hass, 100, state="opening", context=Context(user_id="voice"))
+    await hass.async_block_till_done()
+    assert hass.states.get(OVERRIDE).state == "on"
 
 
 async def test_evening_run_and_follow_up(

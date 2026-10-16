@@ -65,6 +65,7 @@
         "title": "Settings",
         "menu_options": {
           "general": "General",
+          "override": "Manual override",
           "summer": "Summer day",
           "evening": "Evening mode",
           "vacation": "Vacation simulation",
@@ -86,6 +87,16 @@
           "language": "Logbook, last reason and push messages.",
           "notify_services": "Get a message when an open window prevents the sun protection (e.g. notify.mobile_app_phone).",
           "workday_entity": "Optional, for the morning opening by time (e.g. the Workday integration). Without it Monday to Friday are workdays."
+        }
+      },
+      "override": {
+        "title": "Manual override",
+        "description": "When a movement by hand (switch, app, voice assistant) starts the override of a window. Duration and further settings are set per window.",
+        "data": {
+          "override_trigger": "Override starts"
+        },
+        "data_description": {
+          "override_trigger": "Only with a real movement: a command to a cover already at its target (e.g. \"open all\" while it is open) does not start an override. Every command: also without movement, as before."
         }
       },
       "summer": {
@@ -452,6 +463,12 @@
       "options": {
         "sunrise": "Sunrise",
         "elevation": "Sun elevation"
+      }
+    },
+    "override_trigger": {
+      "options": {
+        "movement": "Only when the cover really moves",
+        "command": "With every command by hand, also without movement"
       }
     }
   },

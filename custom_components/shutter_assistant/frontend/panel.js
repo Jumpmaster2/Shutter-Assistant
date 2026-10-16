@@ -12,6 +12,7 @@ const UI = {
     cards: {
       sensors: ["Sensoren & Meldungen", "Außentemperatur, Wettervorhersage, Sprache und wer bei offenem Fenster eine Meldung bekommt."],
       summer: ["Sommertag", "Sonnenschutz gibt es nur an Sommertagen."],
+      override: ["Manuelle Übersteuerung", "Wann eine Bedienung von Hand (Taster, App, Sprachassistent) die Übersteuerung eines Fensters startet. Dauer und weitere Einstellungen stehen am Fenster."],
       startup: ["Neustart-Schutz", "Nach dem Start von Home Assistant eine Weile keine Fahrten."],
       evening: ["Abendmodus", "Schließt die Rollos einmal und sperrt Auto-Hoch. Fenster können eigene Zeiten haben."],
       vacation: ["Urlaubssimulation", "Solange Urlaub ist, öffnen die Fenster morgens und schließen abends zu zufälligen Zeiten."],
@@ -148,6 +149,7 @@ const UI = {
     cards: {
       sensors: ["Sensors & messages", "Outdoor temperature, weather forecast, language and who gets a message about an open window."],
       summer: ["Summer day", "Sun protection only runs on summer days."],
+      override: ["Manual override", "When a movement by hand (switch, app, voice assistant) starts the override of a window. Duration and further settings are set per window."],
       startup: ["Restart protection", "No movement for a while after Home Assistant started."],
       evening: ["Evening mode", "Closes the covers once and blocks auto up. Windows can use own times."],
       vacation: ["Vacation simulation", "While vacation is active, the windows open in the morning and close in the evening at random times."],
@@ -292,6 +294,7 @@ const TABS = [
 const SETTINGS = {
   general: [
     { id: "sensors", icon: "mdi:thermometer", fields: ["outdoor_temperature", "weather", "language", "notify_services", "workday_entity"] },
+    { id: "override", icon: "mdi:hand-back-right-outline", fields: ["override_trigger"] },
     { id: "summer", icon: "mdi:white-balance-sunny", fields: ["summer_threshold", "day_change_time"] },
     { id: "startup", icon: "mdi:restart", fields: ["startup_delay", "catch_up_after"] },
     { id: "house", icon: "mdi:home-outline", fields: ["house_azimuth", "house_width", "house_depth"], preview: true },

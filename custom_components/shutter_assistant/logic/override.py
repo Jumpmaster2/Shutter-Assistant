@@ -86,6 +86,66 @@ def is_manual(
     return old_state != new_state or old_position != new_position
 
 
+@dataclass
+class _Start:
+    state: str
+    position: float | None
+    since: float
+
+
+@dataclass
+class MovementWatch:
+    """Override only after a real movement.
+
+    Remembers where a cover stood when a manual command began and reports once
+    it has really moved. A command to a cover already at its target (e.g. "open
+    all" while it is open) makes many covers report opening and open again
+    without a change of position; that is no movement.
+    """
+
+    timeout: float = 180.0
+    _starts: dict[str, _Start] = field(default_factory=dict)
+
+    def update(
+        self,
+        cover: str,
+        *,
+        started: bool,
+        own: bool,
+        old_state: str | None,
+        old_position: float | None,
+        new_state: str,
+        new_position: float | None,
+        now: float,
+    ) -> bool:
+        """True once the cover really moved after a manual command (``started``)."""
+        if own or new_state in INVALID:
+            self._starts.pop(cover, None)
+            return False
+        start = self._starts.get(cover)
+        if start is not None and now - start.since > self.timeout:
+            del self._starts[cover]
+            start = None
+        if start is None:
+            if not started or old_state is None:
+                return False
+            start = self._starts[cover] = _Start(old_state, old_position, now)
+        if _moved(start, new_state, new_position):
+            del self._starts[cover]
+            return True
+        if new_state not in MOVING:
+            # standing again where it started: the command changed nothing
+            del self._starts[cover]
+        return False
+
+
+def _moved(start: _Start, state: str, position: float | None) -> bool:
+    if start.position is not None and position is not None:
+        return abs(position - start.position) > STATIONARY_TOLERANCE
+    # covers without a position: standing in another state than before
+    return state not in MOVING and state != start.state
+
+
 def override_until(
     now: datetime, duration_minutes: float, next_sunrise: datetime | None
 ) -> datetime | None:

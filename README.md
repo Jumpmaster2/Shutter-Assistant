@@ -6,7 +6,7 @@ Custom Integration für Home Assistant, die Rollos und Raffstores automatisch st
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.2.2.
+> Status: Version 0.2.3.
 
 ## Funktionsweise
 
@@ -35,6 +35,8 @@ Die Integration arbeitet ereignisgesteuert: Sie reagiert nur auf Zustandswechsel
 ### Übersteuerung
 
 Jede manuelle Bewegung (am Taster, in der App, nicht durch Shutter Assistant und nicht durch andere Automationen oder Skripte) startet eine Übersteuerung für das Fenster, Standard 60 min. Jede weitere Bewegung startet sie neu. Optional endet sie zusätzlich bei Sonnenaufgang, mit Dauer 0 nur bei Sonnenaufgang. Die Integration merkt sich ihre eigenen Fahrten, späte Positionsmeldungen werden deshalb nicht fälschlich als manuell gewertet.
+
+In den Grundeinstellungen (Dashboard **Allgemein**, Karte **Manuelle Übersteuerung**) lässt sich wählen, wann sie beginnt: **nur wenn das Rollo wirklich fährt** (Standard; die Position ändert sich um mehr als 2 %, bei Rollos ohne Position steht es danach anders) oder **bei jedem Befehl von Hand, auch ohne Fahrt**. Mit dem Standard startet z. B. „Alexa, alle Rollos auf“ keine Übersteuerung bei Rollos, die schon offen sind.
 
 ### Zusatzbedingungen statt Sonderregeln
 
@@ -96,6 +98,7 @@ Die Werte werden genauso geprüft wie in den Dialogen (gleiche Bereiche, Einheit
 | Urlaub morgens ab, Zufallszeitraum | 07:00, 60 min | |
 | Öffnungsposition von, bis | 60 %, 100 % | |
 | Urlaub abends ab, Zufallszeitraum | 19:00, 90 min | |
+| Übersteuerung beginnt | nur bei echter Fahrt | oder bei jedem Befehl von Hand, auch ohne Fahrt |
 | Neustart-Schutz | 5 min | |
 | Abendlauf nachholen ab | 12:00 | |
 

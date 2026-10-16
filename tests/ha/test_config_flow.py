@@ -73,6 +73,22 @@ async def test_options_flow(hass: HomeAssistant, base_states) -> None:
     assert entry.options["outdoor_temperature"] == OUTDOOR
 
 
+async def test_options_override_trigger(hass: HomeAssistant, base_states) -> None:
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    assert entry.options["override_trigger"] == "movement"
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "override"}
+    )
+    assert result["step_id"] == "override"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"override_trigger": "command"}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["override_trigger"] == "command"
+
+
 async def test_group_subentry(hass: HomeAssistant, base_states) -> None:
     entry = make_entry()
     await setup_entry(hass, entry)
