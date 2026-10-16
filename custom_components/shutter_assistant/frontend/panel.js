@@ -906,7 +906,7 @@ class ShutterAssistantPanel extends HTMLElement {
     return `<div class="card tile-card">
       <div class="tile-head">
         ${this._shutter(position)}
-        <div class="grow">
+        <div class="tile-name">
           <div class="tile-title"><ha-icon icon="${icon}"></ha-icon>${esc(win.title)}</div>
           <div class="muted small">${esc(position === null ? ui.unavailable : `${ui.position} ${position} %`)} · ${esc(ui.window)} ${esc(open ? ui.open : ui.closed)}</div>
         </div>
@@ -1384,10 +1384,12 @@ class ShutterAssistantPanel extends HTMLElement {
     return `<div class="card editor-head">
         <button class="icon-btn" data-action="close-edit" title="${esc(ui.cancel)}"><ha-icon icon="mdi:arrow-left"></ha-icon></button>
         <ha-icon icon="${isWindow ? "mdi:window-shutter" : "mdi:compass-outline"}"></ha-icon>
-        <h2 class="grow">${esc(title)}</h2>
-        ${win ? this._statusPill(win) : ""}
-        ${e.id && isWindow ? `<button class="btn" data-action="duplicate"><ha-icon icon="mdi:content-copy"></ha-icon><span class="hide-narrow">${esc(ui.duplicate)}</span></button>` : ""}
-        ${e.id ? `<button class="btn danger" data-action="delete-sub"><ha-icon icon="mdi:delete-outline"></ha-icon><span class="hide-narrow">${esc(ui.delete)}</span></button>` : ""}
+        <h2 class="head-title">${esc(title)}</h2>
+        <div class="head-actions">
+          ${win ? this._statusPill(win) : ""}
+          ${e.id && isWindow ? `<button class="btn" data-action="duplicate"><ha-icon icon="mdi:content-copy"></ha-icon><span class="hide-narrow">${esc(ui.duplicate)}</span></button>` : ""}
+          ${e.id ? `<button class="btn danger" data-action="delete-sub"><ha-icon icon="mdi:delete-outline"></ha-icon><span class="hide-narrow">${esc(ui.delete)}</span></button>` : ""}
+        </div>
       </div>
       ${e.notice ? `<div class="card banner info"><ha-icon icon="mdi:information-outline"></ha-icon><span>${esc(e.notice)}</span></div>` : ""}
       <div class="grid editor-grid">${cards}</div>
@@ -1807,7 +1809,9 @@ input:focus, select:focus, textarea:focus { outline:2px solid var(--primary-colo
 .dot.big { width:14px; height:14px; }
 .tile-card { display:flex; flex-direction:column; gap:8px; }
 .tile-card .actions { margin-top:auto; padding-top:4px; }
-.tile-head { display:flex; align-items:center; gap:12px; }
+.tile-head { display:flex; align-items:center; gap:8px 12px; flex-wrap:wrap; }
+.tile-name { flex:1 1 9em; min-width:0; }
+.tile-title, .head-title { overflow-wrap:break-word; }
 .tile-title { display:flex; align-items:center; gap:8px; font-size:16px; font-weight:500; }
 .tile-title ha-icon { --mdc-icon-size:20px; color:var(--state-icon-color, var(--primary-color)); }
 .shutter { position:relative; display:inline-block; flex:none; width:26px; height:34px; border:2px solid var(--secondary-text-color); border-radius:3px; overflow:hidden; vertical-align:middle; background:linear-gradient(var(--secondary-background-color, #e3f2fd), var(--secondary-background-color, #e3f2fd)); }
@@ -1865,6 +1869,8 @@ td { padding:8px; border-bottom:1px solid var(--divider-color); vertical-align:m
 tbody tr { cursor:pointer; }
 .editor-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .editor-head h2 { margin:0; }
+.editor-head .head-title { flex:1 1 8em; min-width:0; }
+.head-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
 .editor-head > ha-icon { color:var(--state-icon-color, var(--primary-color)); }
 .editor-actions { position:sticky; bottom:0; z-index:2; display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin-top:16px; padding:12px 16px; border:1px solid var(--divider-color); border-radius:12px; background:var(--ha-card-background, var(--card-background-color, #fff)); box-shadow:0 -2px 8px rgba(0,0,0,.08); }
 .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--primary-text-color); color:var(--primary-background-color); padding:10px 18px; border-radius:8px; z-index:10; }
