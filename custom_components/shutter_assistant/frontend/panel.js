@@ -104,6 +104,19 @@ const UI = {
     sunCheck: "Sonnenbedingung",
     check: {
       summer: "Sommertag",
+      night: "Nacht (später Sommertag)",
+      nightText: (v, t) => `Tiefstwert ${v} °C, ab ${t} °C`,
+      noNight: "kein Tiefstwert",
+      raisedText: (v) => `durch die Außentemperatur${v ? `, ${v}` : ""}`,
+      room: "Raum zu warm",
+      roomText: (v, l) => `${v} °C, ab ${l} °C`,
+      roomUnknown: "kein Wert, zählt als warm",
+      cooling: "Klimaanlage",
+      coolingOn: "kühlt, Raum zählt als warm",
+      coolingOff: "kühlt nicht",
+      heating: "Heizbedarf",
+      heatingOn: "an, Sonnenwärme erwünscht",
+      heatingOff: "aus",
       temperature: "Außentemperatur",
       hold: "Haltezeit Sonne",
       sector: "Sonne im Bereich (zum Absenken)",
@@ -241,6 +254,19 @@ const UI = {
     sunCheck: "Sun condition",
     check: {
       summer: "Summer day",
+      night: "Night (late summer day)",
+      nightText: (v, t) => `low ${v} °C, from ${t} °C`,
+      noNight: "no forecast low",
+      raisedText: (v) => `by the outdoor temperature${v ? `, ${v}` : ""}`,
+      room: "Room too warm",
+      roomText: (v, l) => `${v} °C, from ${l} °C`,
+      roomUnknown: "no value, counts as warm",
+      cooling: "Air conditioner",
+      coolingOn: "cooling, room counts as warm",
+      coolingOff: "not cooling",
+      heating: "Heating wanted",
+      heatingOn: "on, warmth of the sun welcome",
+      heatingOff: "off",
       temperature: "Outdoor temperature",
       hold: "Sun hold time",
       sector: "Sun in the sector (for lowering)",
@@ -295,7 +321,7 @@ const SETTINGS = {
   general: [
     { id: "sensors", icon: "mdi:thermometer", fields: ["outdoor_temperature", "weather", "language", "notify_services", "workday_entity"] },
     { id: "override", icon: "mdi:hand-back-right-outline", fields: ["override_trigger"] },
-    { id: "summer", icon: "mdi:white-balance-sunny", fields: ["summer_threshold", "day_change_time"] },
+    { id: "summer", icon: "mdi:white-balance-sunny", fields: ["summer_threshold", "night_threshold", "heating_entity", "day_change_time"] },
     { id: "startup", icon: "mdi:restart", fields: ["startup_delay", "catch_up_after"] },
     { id: "house", icon: "mdi:home-outline", fields: ["house_azimuth", "house_width", "house_depth"], preview: true },
   ],
@@ -332,6 +358,9 @@ const WINDOW_CARDS = [
       ...KINDS.filter(([, sensors]) => (group?.data?.[sensors] || []).length).map(([, , threshold]) => threshold),
       "temperature_threshold",
       "temperature_hold",
+      "room_entity",
+      ...(String(d.room_entity || "").startsWith("climate.") ? ["room_margin"] : d.room_entity ? ["room_threshold"] : []),
+      "cooling_entity",
       "sun_hold",
       "sun_position",
       "position_tolerance",
@@ -847,7 +876,7 @@ class ShutterAssistantPanel extends HTMLElement {
     const threshold = this._num(cfg.options.summer_threshold);
     let summerText = summer ? (summer.state === "on" ? ui.yes : ui.no) : ui.unavailable;
     if (summer) {
-      if (sa.raised_by_outdoor_temperature) summerText += ` (${ui.raised})`;
+      if (sa.raised_by_outdoor_temperature && summer.state === "on") summerText += ` (${ui.raised})`;
       else summerText += ` (${sa.forecast_max !== null && sa.forecast_max !== undefined ? ui.forecast(this._num(sa.forecast_max), threshold) : ui.noForecast})`;
     }
     const evening = this._state(ent.evening_mode);
@@ -889,14 +918,14 @@ class ShutterAssistantPanel extends HTMLElement {
       for (const id of ids.filter(Boolean)) if (!exists(id)) hints.push(["mdi:alert-outline", ui.missing(where, id)]);
     };
     const o = cfg.options;
-    check(ui.global, [o.outdoor_temperature, o.weather, o.workday_entity, ...(o.vacation_entities || [])]);
+    check(ui.global, [o.outdoor_temperature, o.weather, o.workday_entity, o.heating_entity, ...(o.vacation_entities || [])]);
     for (const svc of o.notify_services || []) {
       if (!(cfg.notify_services || []).includes(svc)) hints.push(["mdi:alert-outline", ui.missing(ui.global, svc)]);
     }
     for (const group of this._groups) check(group.title, KINDS.flatMap(([, sensors]) => group.data[sensors] || []));
     for (const win of this._windows) {
       const d = win.data;
-      check(win.title, [d.cover, ...(d.window_sensors || []), d.open_block_entity, d.window_exception_entity, ...(d.close_trigger_entities || []), d.morning_enabled && d.morning_mode === "trigger" ? d.morning_trigger_entity : null]);
+      check(win.title, [d.cover, ...(d.window_sensors || []), d.room_entity, d.cooling_entity, d.open_block_entity, d.window_exception_entity, ...(d.close_trigger_entities || []), d.morning_enabled && d.morning_mode === "trigger" ? d.morning_trigger_entity : null]);
       if (d.group && !this._group(d.group)) hints.push(["mdi:alert-outline", ui.missingGroup(win.title)]);
     }
     if (!o.weather) hints.push(["mdi:information-outline", ui.noWeather]);
@@ -959,7 +988,14 @@ class ShutterAssistantPanel extends HTMLElement {
     const a = sensor.attributes;
     const rows = [];
     const row = (state, label, detail) => rows.push([state, label, detail]);
-    row(a.summer_day ? "ok" : "fail", c.summer, a.forecast_max !== null && a.forecast_max !== undefined ? ui.forecast(this._num(a.forecast_max), this._num(a.summer_threshold)) : ui.noForecast);
+    const has = (v) => v !== null && v !== undefined;
+    const forecastText = has(a.forecast_max) ? ui.forecast(this._num(a.forecast_max), this._num(a.summer_threshold)) : ui.noForecast;
+    const byForecast = has(a.forecast_max) && Number(a.forecast_max) >= Number(a.summer_threshold);
+    row(a.summer_day ? "ok" : "fail", c.summer, a.raised_by_outdoor_temperature && !byForecast ? c.raisedText(forecastText) : forecastText);
+    if (a.raised_by_outdoor_temperature && !byForecast && has(a.night_threshold)) {
+      const nightOk = !has(a.night_low) || Number(a.night_low) >= Number(a.night_threshold);
+      row(nightOk ? "ok" : "fail", c.night, has(a.night_low) ? c.nightText(this._num(a.night_low), this._num(a.night_threshold)) : c.noNight);
+    }
     const outdoor = this._state(a.temperature_sensor);
     const temp = outdoor && !INVALID.includes(outdoor.state) ? `${this._num(outdoor.state)} °C` : c.noValue;
     row(
@@ -978,11 +1014,20 @@ class ShutterAssistantPanel extends HTMLElement {
         row(ok ? "ok" : "fail", `${ui.kinds[kind]}: ${this._name(id)}`, `${value === null || Number.isNaN(value) ? c.noValue : `${this._num(value, 0)} ${unit}`}, ${c.from} ${this._num(info.threshold, 0)} ${unit}`);
       }
     }
+    if (a.room_entity) {
+      row(
+        a.room_warm === false ? "fail" : "ok",
+        `${c.room}: ${this._name(a.room_entity)}`,
+        has(a.room_temperature) ? c.roomText(this._num(a.room_temperature), this._num(a.room_limit)) : c.roomUnknown,
+      );
+    }
+    if (a.cooling_entity) row(a.cooling ? "ok" : "muted", `${c.cooling}: ${this._name(a.cooling_entity)}`, a.cooling ? c.coolingOn : c.coolingOff);
+    if (a.heating_entity) row(a.heating_day ? (a.heat_need ? "ok" : "fail") : "ok", `${c.heating}: ${this._name(a.heating_entity)}`, a.heating_day ? c.heatingOn : c.heatingOff);
     row(sensor.state === "on" ? "ok" : a.condition_on_at ? "wait" : "fail", c.hold, a.condition_on_at ? c.pendingAt(this._time(a.condition_on_at)) : c.holdText(this._num(a.sun_hold, 0)));
     const sunAz = this._state("sun.sun")?.attributes?.azimuth;
     row(a.in_sector ? "ok" : "fail", c.sector, sunAz !== undefined ? c.sectorText(this._num(sunAz, 0), this._num(a.azimuth_from, 0), this._num(a.azimuth_to, 0)) : `${this._num(a.azimuth_from, 0)}° – ${this._num(a.azimuth_to, 0)}°`);
     const today = this._state(win.entities?.sun_protection_today)?.state === "on";
-    const icons = { ok: "mdi:check-circle", fail: "mdi:close-circle-outline", wait: "mdi:timer-sand" };
+    const icons = { ok: "mdi:check-circle", fail: "mdi:close-circle-outline", wait: "mdi:timer-sand", muted: "mdi:minus-circle-outline" };
     return `<div class="check">
       <div class="check-result ${sensor.state === "on" ? "ok" : ""}"><ha-icon icon="mdi:white-balance-sunny"></ha-icon>
         <span class="grow">${esc(sensor.state === "on" ? c.on : c.off)}</span>
@@ -1860,6 +1905,7 @@ td .shutter { width:16px; height:22px; border-width:1.5px; margin-right:6px; }
 .check-row.ok ha-icon { color:var(--success-color, #43a047); }
 .check-row.fail ha-icon { color:var(--disabled-text-color, #9e9e9e); }
 .check-row.wait ha-icon { color:var(--warning-color, #ffa600); }
+.check-row.muted ha-icon { color:var(--disabled-text-color, #9e9e9e); }
 .check-detail { color:var(--secondary-text-color); text-align:right; }
 .compass-wrap { display:flex; justify-content:center; margin:4px 0; }
 .compass-wrap.small { flex-direction:column; align-items:center; }

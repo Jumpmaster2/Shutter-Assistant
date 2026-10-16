@@ -1,6 +1,16 @@
 """Hold times, follow-up and sensor thresholds."""
 
-from logic.conditions import FollowUp, Hold, as_float, at_least, sensors_ok, summer_day
+from logic.conditions import (
+    FollowUp,
+    Hold,
+    as_float,
+    at_least,
+    cooling_active,
+    heat_need,
+    room_warm,
+    sensors_ok,
+    summer_day,
+)
 
 
 def test_hold_turns_on_after_hold_and_off_immediately() -> None:
@@ -79,3 +89,49 @@ def test_summer_day() -> None:
     assert not summer_day(22.9, 23.0, False)
     assert summer_day(18.0, 23.0, True)
     assert not summer_day(None, 23.0, False)
+
+
+def test_late_summer_day_needs_a_warm_night() -> None:
+    # by the forecast: the night does not matter
+    assert summer_day(25.0, 23.0, False, 8.0, 14.0)
+    # only by the outdoor temperature: the night decides
+    assert not summer_day(19.4, 23.0, True, 9.0, 14.0)
+    assert summer_day(19.4, 23.0, True, 14.0, 14.0)
+    # unknown low or no threshold: as before
+    assert summer_day(19.4, 23.0, True, None, 14.0)
+    assert summer_day(19.4, 23.0, True, 9.0, None)
+    assert summer_day(None, 23.0, True, 9.0, None)
+    assert not summer_day(19.4, 23.0, False, 20.0, 14.0)
+
+
+def test_room_warm() -> None:
+    assert room_warm(23.0, 21.0, 2.0, 24.0)
+    assert not room_warm(22.9, 21.0, 2.0, 24.0)
+    # without a setpoint the fixed threshold counts
+    assert room_warm(24.0, None, 2.0, 24.0)
+    assert not room_warm(23.9, None, 2.0, 24.0)
+    assert room_warm(None, 21.0, 2.0, 24.0) is None
+
+
+def test_cooling_active() -> None:
+    assert cooling_active("cool", "cooling")
+    assert cooling_active("cool", "idle")
+    assert cooling_active("cool", None)
+    assert cooling_active("auto", "cooling")
+    assert cooling_active("heat_cool", "cooling")
+    assert not cooling_active("auto", "idle")
+    assert not cooling_active("cool", "off")
+    assert not cooling_active("off", None)
+    assert not cooling_active("heat", "heating")
+    assert not cooling_active(None, None)
+
+
+def test_heat_need() -> None:
+    # no room entity: as before, except on a heating day
+    assert heat_need(None, False, False)
+    assert not heat_need(None, False, True)
+    # the room decides
+    assert heat_need(True, False, True)
+    assert not heat_need(False, False, False)
+    # a cooling air conditioner counts as a warm room
+    assert heat_need(False, True, True)

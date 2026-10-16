@@ -45,6 +45,10 @@ export const LABELS = {
    "Gilt als geschlossen bis",
    "Für Lüften und Urlaub morgens."
   ],
+  "cooling_entity": [
+   "Klimaanlage",
+   "Optional: Solange diese Klimaanlage kühlt, gilt der Raum als zu warm. Der Sonnenschutz entlastet dann die Klimaanlage."
+  ],
   "cover": [
    "Rollo",
    "100 % = offen, 0 % = zu."
@@ -84,6 +88,10 @@ export const LABELS = {
   "group": [
    "Gruppe",
    "Himmelsrichtung. Ohne Gruppe hat das Fenster keinen Sonnenschutz."
+  ],
+  "heating_entity": [
+   "Heizbedarf",
+   "Optional, z. B. der Heiztag des AI Heating Assistant. Solange sie an ist, ist Sonnenwärme erwünscht: Sonnenschutz nur, wenn der Raum eines Fensters trotzdem zu warm ist. Fenster ohne Raumtemperatur werden dann nicht abgesenkt."
   ],
   "language": [
    "Sprache der Meldungen",
@@ -181,6 +189,10 @@ export const LABELS = {
    "Ende der Nacht",
    "Abendmodus und Abend-Marker enden um diese Uhrzeit (oder bei Sonnenaufgang, falls früher)."
   ],
+  "night_threshold": [
+   "Später Sommertag nur bei Nacht ab",
+   "Wird der Tag erst durch die Außentemperatur zum Sommertag, zählt das nur, wenn der Vorhersage-Tiefstwert der kommenden Nacht mindestens so hoch ist. Kühlt es nachts ab (Frühling, Herbst), bleibt die Wärme im Haus. Ohne Tiefstwert in der Vorhersage gilt der Sommertag wie bisher."
+  ],
   "notify_open_window": [
    "Bei offenem Fenster benachrichtigen",
    "Einmal am Tag, wenn ein offenes Fenster den Sonnenschutz verhindert hat."
@@ -237,17 +249,29 @@ export const LABELS = {
    "Strahlungsschwelle",
    "Jeder Strahlungssensor der Gruppe muss diesen Wert erreichen."
   ],
+  "room_entity": [
+   "Raumtemperatur",
+   "Optional: Thermostat (climate, z. B. vom AI Heating Assistant) oder Temperatursensor des Raums. Dann wird nur abgesenkt, wenn der Raum zu warm ist. Ohne Wert gilt die Bedingung als erfüllt (außer am Heiztag)."
+  ],
+  "room_margin": [
+   "Zu warm ab Sollwert plus",
+   "Bei einem Thermostat: zu warm ab dessen Sollwert plus diesem Abstand."
+  ],
+  "room_threshold": [
+   "Zu warm ab",
+   "Bei einem Temperatursensor (oder einem Thermostat ohne Sollwert): zu warm ab dieser Temperatur."
+  ],
   "startup_delay": [
    "Neustart-Schutz",
    "Nach dem Start von Home Assistant so lange keine Fahrt (Sensoren und Rollos melden sich noch an)."
   ],
   "summer_threshold": [
    "Sommertag ab Vorhersage-Höchsttemperatur",
-   "Ohne Sommertag gibt es keinen Sonnenschutz. Tagsüber beginnt der Sommertag auch, wenn die Außentemperatur über diesen Wert steigt."
+   "Ohne Sommertag gibt es keinen Sonnenschutz. Tagsüber beginnt der Sommertag auch, wenn die Außentemperatur über diesen Wert steigt (siehe Nacht)."
   ],
   "sun_hold": [
    "Haltezeit Sonne",
-   "So lange müssen Sommertag, Temperatur und alle Sonnensensoren erfüllt sein. Die Bedingung endet sofort."
+   "So lange müssen Sommertag, Temperatur, Raum und alle Sonnensensoren erfüllt sein. Die Bedingung endet sofort."
   ],
   "sun_position": [
    "Sonnenschutz-Position",
@@ -371,6 +395,10 @@ export const LABELS = {
    "Counts as closed up to",
    "Used for ventilation and the vacation morning."
   ],
+  "cooling_entity": [
+   "Air conditioner",
+   "Optional: while this air conditioner cools, the room counts as too warm. Sun protection then takes load off the air conditioner."
+  ],
   "cover": [
    "Cover",
    "100 % = open, 0 % = closed."
@@ -410,6 +438,10 @@ export const LABELS = {
   "group": [
    "Group",
    "Direction of the sun. Without a group the window has no sun protection."
+  ],
+  "heating_entity": [
+   "Heating wanted",
+   "Optional, e.g. the heating day of AI Heating Assistant. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are not lowered then."
   ],
   "language": [
    "Language of messages",
@@ -507,6 +539,10 @@ export const LABELS = {
    "End of the night",
    "Evening mode and evening markers end at this time (or at sunrise if that is earlier)."
   ],
+  "night_threshold": [
+   "Late summer day only with a night from",
+   "A summer day only by the outdoor temperature counts only when the forecast low of the coming night is at least this value. When the night cools down (spring, autumn), the warmth stays in the house. Without a low in the forecast the summer day counts as before."
+  ],
   "notify_open_window": [
    "Notify about an open window",
    "Once a day, if an open window prevented the sun protection."
@@ -563,17 +599,29 @@ export const LABELS = {
    "Radiation threshold",
    "Every radiation sensor of the group must reach this value."
   ],
+  "room_entity": [
+   "Room temperature",
+   "Optional: thermostat (climate, e.g. from AI Heating Assistant) or temperature sensor of the room. Then the cover is only lowered when the room is too warm. Without a value the condition counts as met (except on a heating day)."
+  ],
+  "room_margin": [
+   "Too warm from setpoint plus",
+   "With a thermostat: too warm from its setpoint plus this margin."
+  ],
+  "room_threshold": [
+   "Too warm from",
+   "With a temperature sensor (or a thermostat without a setpoint): too warm from this temperature."
+  ],
   "startup_delay": [
    "Restart protection",
    "No movement for this time after Home Assistant started (sensors and covers are still coming online)."
   ],
   "summer_threshold": [
    "Summer day from forecast high",
-   "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value."
+   "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value (see night)."
   ],
   "sun_hold": [
    "Sun hold time",
-   "Summer day, temperature and all sun sensors must be fulfilled this long. The condition ends immediately."
+   "Summer day, temperature, room and all sun sensors must be met this long. The condition ends immediately."
   ],
   "sun_position": [
    "Sun protection position",

@@ -24,10 +24,14 @@
         "description": "Sun protection only runs on summer days.",
         "data": {
           "summer_threshold": "Summer day from forecast high",
+          "night_threshold": "Late summer day only with a night from",
+          "heating_entity": "Heating wanted",
           "day_change_time": "Day change"
         },
         "data_description": {
-          "summer_threshold": "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value.",
+          "summer_threshold": "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value (see night).",
+          "night_threshold": "A summer day only by the outdoor temperature counts only when the forecast low of the coming night is at least this value. When the night cools down (spring, autumn), the warmth stays in the house. Without a low in the forecast the summer day counts as before.",
+          "heating_entity": "Optional, e.g. the heating day of AI Heating Assistant. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are not lowered then.",
           "day_change_time": "Forecast check and reset of the daily sun protection markers and notifications."
         }
       },
@@ -104,10 +108,14 @@
         "description": "Sun protection only runs on summer days.",
         "data": {
           "summer_threshold": "Summer day from forecast high",
+          "night_threshold": "Late summer day only with a night from",
+          "heating_entity": "Heating wanted",
           "day_change_time": "Day change"
         },
         "data_description": {
-          "summer_threshold": "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value.",
+          "summer_threshold": "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value (see night).",
+          "night_threshold": "A summer day only by the outdoor temperature counts only when the forecast low of the coming night is at least this value. When the night cools down (spring, autumn), the warmth stays in the house. Without a low in the forecast the summer day counts as before.",
+          "heating_entity": "Optional, e.g. the heating day of AI Heating Assistant. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are not lowered then.",
           "day_change_time": "Forecast check and reset of the daily sun protection markers and notifications."
         }
       },
@@ -264,6 +272,10 @@
             "lux_threshold": "Brightness threshold",
             "temperature_threshold": "Outdoor temperature at least",
             "temperature_hold": "Temperature hold time",
+            "room_entity": "Room temperature",
+            "room_margin": "Too warm from setpoint plus",
+            "room_threshold": "Too warm from",
+            "cooling_entity": "Air conditioner",
             "sun_hold": "Sun hold time",
             "sun_position": "Sun protection position",
             "position_tolerance": "Tolerance for auto up",
@@ -280,7 +292,11 @@
             "lux_threshold": "Every brightness sensor of the group must reach this value.",
             "temperature_threshold": "Sun protection only from this outdoor temperature on.",
             "temperature_hold": "The outdoor temperature must stay above the value this long. Below it the condition ends immediately.",
-            "sun_hold": "Summer day, temperature and all sun sensors must be fulfilled this long. The condition ends immediately.",
+            "room_entity": "Optional: thermostat (climate, e.g. from AI Heating Assistant) or temperature sensor of the room. Then the cover is only lowered when the room is too warm. Without a value the condition counts as met (except on a heating day).",
+            "room_margin": "With a thermostat: too warm from its setpoint plus this margin.",
+            "room_threshold": "With a temperature sensor (or a thermostat without a setpoint): too warm from this temperature.",
+            "cooling_entity": "Optional: while this air conditioner cools, the room counts as too warm. Sun protection then takes load off the air conditioner.",
+            "sun_hold": "Summer day, temperature, room and all sun sensors must be met this long. The condition ends immediately.",
             "sun_position": "Lowered once a day to this position. A cover already further closed is left alone.",
             "position_tolerance": "Auto up only opens covers standing at the sun protection position up to this much above it. Covers moved elsewhere by hand stay.",
             "auto_up": "Open again when the sun leaves the sector (not in the evening).",

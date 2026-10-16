@@ -89,9 +89,66 @@ def sensors_ok(values: Mapping[str, Iterable[object]], thresholds: Mapping[str, 
     return True
 
 
-def summer_day(forecast_max: float | None, threshold: float, raised_today: bool) -> bool:
+def summer_day(
+    forecast_max: float | None,
+    threshold: float,
+    raised_today: bool,
+    night_low: float | None = None,
+    night_threshold: float | None = None,
+) -> bool:
     """Summer day: forecast high reaches the threshold, or the outdoor temperature
-    exceeded it today."""
-    if raised_today:
+    exceeded it today.
+
+    A summer day only by the outdoor temperature (forecast below the threshold)
+    also needs a warm night: when the forecast low of the coming night is below
+    ``night_threshold``, the house cools down again and a warm afternoon alone is
+    no reason for sun protection. Without a forecast low it counts as before.
+    """
+    if forecast_max is not None and forecast_max >= threshold:
         return True
-    return forecast_max is not None and forecast_max >= threshold
+    if not raised_today:
+        return False
+    return night_threshold is None or night_low is None or night_low >= night_threshold
+
+
+def room_warm(
+    current: float | None,
+    setpoint: float | None,
+    margin: float,
+    threshold: float,
+) -> bool | None:
+    """Is the room too warm? None if the room temperature is unknown.
+
+    With a setpoint (thermostat) the room is too warm from setpoint + margin on,
+    otherwise from the fixed threshold.
+    """
+    if current is None:
+        return None
+    limit = setpoint + margin if setpoint is not None else threshold
+    return current >= limit
+
+
+def cooling_active(hvac_mode: str | None, hvac_action: str | None) -> bool:
+    """Is an air conditioner cooling?
+
+    It cools while its action is ``cooling``. In the mode ``cool`` it also counts
+    while idle (it holds the room cool) and when it reports no action.
+    """
+    if hvac_action == "cooling":
+        return True
+    return hvac_mode == "cool" and hvac_action in (None, "idle", "cooling")
+
+
+def heat_need(room: bool | None, cooling: bool, heating_day: bool) -> bool:
+    """Is there a reason to keep the heat of the sun out of the room?
+
+    ``room``: the room is too warm (None: no room entity or unknown value). A
+    cooling air conditioner counts as a warm room (sun protection saves cooling
+    energy). Without a room value it counts as warm (as before), except on a
+    heating day: then the warmth of the sun is welcome.
+    """
+    if cooling or room is True:
+        return True
+    if room is False:
+        return False
+    return not heating_day

@@ -51,6 +51,7 @@ from .const import (
     CONF_AZIMUTH_TO,
     CONF_CATCH_UP_AFTER,
     CONF_CLOSED_POSITION,
+    CONF_COOLING_ENTITY,
     CONF_COVER,
     CONF_DAY_CHANGE,
     CONF_EVENING_CLOSE,
@@ -61,6 +62,7 @@ from .const import (
     CONF_FOLLOW_UP_CLOSE,
     CONF_FOLLOW_UP_EARLIEST,
     CONF_GROUP,
+    CONF_HEATING_ENTITY,
     CONF_LANGUAGE,
     CONF_MANUAL_AT_SUN,
     CONF_MANUAL_FOLLOW_UP,
@@ -82,6 +84,7 @@ from .const import (
     CONF_MORNING_WEEKEND,
     CONF_MORNING_WORKDAY,
     CONF_NIGHT_END,
+    CONF_NIGHT_THRESHOLD,
     CONF_NOTIFY,
     CONF_NOTIFY_OPEN,
     CONF_OPEN_BLOCK,
@@ -91,6 +94,9 @@ from .const import (
     CONF_OVERRIDE_IGNORE_EVENING,
     CONF_OVERRIDE_SUNRISE,
     CONF_OVERRIDE_TRIGGER,
+    CONF_ROOM_ENTITY,
+    CONF_ROOM_MARGIN,
+    CONF_ROOM_THRESHOLD,
     CONF_STARTUP_DELAY,
     CONF_SUMMER_THRESHOLD,
     CONF_SUN_HOLD,
@@ -138,7 +144,17 @@ from .const import (
 from .logic import morning as mo
 from .logic import sun as sunlib
 from .logic import window as rules
-from .logic.conditions import FollowUp, Hold, as_float, at_least, sensors_ok, summer_day
+from .logic.conditions import (
+    FollowUp,
+    Hold,
+    as_float,
+    at_least,
+    cooling_active,
+    heat_need,
+    room_warm,
+    sensors_ok,
+    summer_day,
+)
 from .logic.evening import EveningSettings, evening_day, evening_end, evening_start, is_evening
 from .logic.override import MOVING, CommandTracker, MovementWatch, is_manual, override_until
 from .logic.vacation import random_position, random_time
@@ -237,6 +253,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self.automatic = True
         self.forecast_day: date | None = None
         self.forecast_max: float | None = None
+        self.forecast_night_low: float | None = None
         self.raised_day: date | None = None
         self.vacation_evening_day: date | None = None
         self.startup_until: datetime | None = None
@@ -397,6 +414,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self.automatic = bool(stored.get("automatic", True))
         self.forecast_day = _to_date(stored.get("forecast_day"))
         self.forecast_max = as_float(stored.get("forecast_max"))
+        self.forecast_night_low = as_float(stored.get("forecast_night_low"))
         self.raised_day = _to_date(stored.get("raised_day"))
         self.vacation_evening_day = _to_date(stored.get("vacation_evening_day"))
         windows = stored.get("windows") or {}
@@ -425,6 +443,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             "automatic": self.automatic,
             "forecast_day": _iso(self.forecast_day),
             "forecast_max": self.forecast_max,
+            "forecast_night_low": self.forecast_night_low,
             "raised_day": _iso(self.raised_day),
             "vacation_evening_day": _iso(self.vacation_evening_day),
             "windows": {
@@ -509,6 +528,14 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         }
         workday = self.opt(CONF_WORKDAY)
         track(morning | ({workday} if workday else set()), self._on_morning_input)
+        heat_inputs = {
+            str(w.conf.get(key))
+            for w in self.windows.values()
+            for key in (CONF_ROOM_ENTITY, CONF_COOLING_ENTITY)
+            if w.conf.get(key)
+        }
+        heating = self.opt(CONF_HEATING_ENTITY)
+        track(heat_inputs | ({heating} if heating else set()), self._on_heat_input)
 
     def _schedule_daily(self) -> None:
         def daily(value: Any, fallback: str, handler: Callable[[datetime], None]) -> None:
@@ -617,8 +644,21 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         # Without today's forecast the last known value counts (as before) until the
         # retry succeeds.
         return summer_day(
-            self.forecast_max, float(self.opt(CONF_SUMMER_THRESHOLD)), self.raised_day == today
+            self.forecast_max,
+            float(self.opt(CONF_SUMMER_THRESHOLD)),
+            self.raised_day == today,
+            self.forecast_night_low,
+            self._night_threshold,
         )
+
+    @property
+    def _night_threshold(self) -> float | None:
+        return as_float(self.opt(CONF_NIGHT_THRESHOLD))
+
+    @property
+    def heating_day(self) -> bool:
+        """The heating entity is on: the warmth of the sun is welcome."""
+        return self._state_value(self.opt(CONF_HEATING_ENTITY)) == STATE_ON
 
     def _evening_window(self, settings: EveningSettings, day: date) -> tuple[datetime, datetime]:
         """Start and end of the evening of ``day`` (cached, the sun is the same all day)."""
@@ -689,7 +729,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         sens = group is not None and sensors_ok(self._sensor_values(group), self._thresholds(win))
         in_sector, past_end = self._sector(win, now)
         summer = self.summer
-        win.live_hold.update(group is not None and summer and temp_ok and sens, ts)
+        heat = self._heat_need(win)
+        win.live_hold.update(group is not None and summer and temp_ok and sens and heat, ts)
         win.no_temp.update(group is not None and summer and in_sector and sens, ts)
         live = win.live_hold.state(ts)
         no_temp = win.no_temp.state(ts)
@@ -716,10 +757,45 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             dt_util.utc_from_timestamp(min(dues)) if dues else None,
             lambda now, wid=win.window_id: self._on_hold_due(wid, now),
         )
-        flags = (temp_ok, sens, live, no_temp, in_sector, past_end, morning_ok)
+        flags = (temp_ok, sens, live, no_temp, in_sector, past_end, morning_ok, heat)
         changed = flags != win.flags
         win.flags = flags
         return changed
+
+    def _room(self, win: Window) -> tuple[float | None, float | None]:
+        """Room temperature and setpoint (setpoint only from a thermostat)."""
+        state = self._state(win.conf.get(CONF_ROOM_ENTITY))
+        if state is None or state.state in INVALID:
+            return None, None
+        if state.domain == "climate":
+            return (
+                as_float(state.attributes.get("current_temperature")),
+                as_float(state.attributes.get("temperature")),
+            )
+        return as_float(state.state), None
+
+    def room_warm(self, win: Window) -> bool | None:
+        """Is the room too warm? None without a room entity or value."""
+        current, setpoint = self._room(win)
+        return room_warm(
+            current,
+            setpoint,
+            float(win.conf[CONF_ROOM_MARGIN]),
+            float(win.conf[CONF_ROOM_THRESHOLD]),
+        )
+
+    def cooling(self, win: Window) -> bool:
+        """The air conditioner of the window cools."""
+        state = self._state(win.conf.get(CONF_COOLING_ENTITY))
+        if state is None:
+            return False
+        return cooling_active(state.state, state.attributes.get("hvac_action"))
+
+    def _heat_need(self, win: Window) -> bool:
+        return heat_need(self.room_warm(win), self.cooling(win), self.heating_day)
+
+    def heat_ok(self, win: Window) -> bool:
+        return bool(len(win.flags) > 7 and win.flags[7])
 
     @property
     def _now_ts(self) -> float:
@@ -749,7 +825,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         return win.notified_day == self._sun_day(now)
 
     def _situation(self, win: Window, now: datetime) -> rules.Situation:
-        flags = win.flags or (False,) * 7
+        flags = win.flags or (False,) * 8
         return rules.Situation(
             automatic=self.automatic,
             startup=self._startup(now),
@@ -780,10 +856,28 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         def at(due: float | None) -> str | None:
             return dt_util.as_local(dt_util.utc_from_timestamp(due)).isoformat() if due else None
 
+        room, setpoint = self._room(win)
         details: dict[str, Any] = {
             "summer_day": self.summer,
             "forecast_max": self.forecast_max,
             "summer_threshold": float(self.opt(CONF_SUMMER_THRESHOLD)),
+            "raised_by_outdoor_temperature": self.raised_day == self._sun_day(dt_util.now()),
+            "night_low": self.forecast_night_low,
+            "night_threshold": self._night_threshold,
+            "heat_need": self.heat_ok(win),
+            "room_entity": win.conf.get(CONF_ROOM_ENTITY),
+            "room_temperature": room,
+            "room_setpoint": setpoint,
+            "room_limit": (
+                setpoint + float(win.conf[CONF_ROOM_MARGIN])
+                if setpoint is not None
+                else float(win.conf[CONF_ROOM_THRESHOLD])
+            ),
+            "room_warm": self.room_warm(win),
+            "cooling_entity": win.conf.get(CONF_COOLING_ENTITY),
+            "cooling": self.cooling(win),
+            "heating_entity": self.opt(CONF_HEATING_ENTITY),
+            "heating_day": self.heating_day,
             "temperature_sensor": self.opt(CONF_OUTDOOR_TEMP),
             "temperature_threshold": float(win.conf[CONF_TEMP_THRESHOLD]),
             "temperature_hold": float(win.conf[CONF_TEMP_HOLD]),
@@ -951,6 +1045,16 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 self._evaluate(win, now)
         if changed:
             self.async_update_listeners()
+
+    @callback
+    def _on_heat_input(self, _event: Event[EventStateChangedData]) -> None:
+        """Room temperature, air conditioner or heating changed."""
+        now = dt_util.now()
+        for win in self.windows.values():
+            if self._refresh(win, now):
+                self._evaluate(win, now)
+        # The sun condition check shows the room values, keep it current.
+        self.async_update_listeners()
 
     @callback
     def _on_sun_sensor(self, event: Event[EventStateChangedData]) -> None:
@@ -1294,6 +1398,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         if not weather:
             return
         value = None
+        night_low = None
         if self._state(weather) is not None:
             try:
                 response = await self.hass.services.async_call(
@@ -1306,6 +1411,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 forecast = (response or {}).get(weather, {}).get("forecast") or []
                 if forecast:
                     value = as_float(forecast[0].get("temperature"))
+                    night_low = _night_low(forecast)
             except (HomeAssistantError, ValueError, AttributeError) as err:
                 LOGGER.warning("Forecast of %s not available: %s", weather, err)
         if value is None:
@@ -1317,6 +1423,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             )
         else:
             self.forecast_max = value
+            self.forecast_night_low = night_low
             self.forecast_day = self._sun_day(now)
             self._cancel("forecast_retry")
         self._save()
@@ -1605,7 +1712,9 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             "automatic": self.automatic,
             "summer_day": self.summer,
             "forecast_max": self.forecast_max,
+            "forecast_night_low": self.forecast_night_low,
             "forecast_day": _iso(self.forecast_day),
+            "heating_day": self.heating_day,
             "evening": self.global_evening_active,
             "vacation": self.vacation,
             "startup_until": _iso(self.startup_until),
@@ -1621,6 +1730,18 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 for wid, win in self.windows.items()
             },
         }
+
+
+def _night_low(forecast: list[dict[str, Any]]) -> float | None:
+    """Forecast low of the coming night.
+
+    The low of tomorrow is the early morning after this night; without it the
+    low of today.
+    """
+    for day in forecast[1:2] + forecast[:1]:
+        if (low := as_float(day.get("templow"))) is not None:
+            return low
+    return None
 
 
 def _iso(value: date | datetime | None) -> str | None:

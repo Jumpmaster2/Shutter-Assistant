@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.2.3.
+> Status: version 0.3.0.
 
 ## How it works
 
@@ -19,8 +19,9 @@ The integration is event driven: it only reacts to state changes of the configur
 
 ### Sun protection
 
-* **Summer day:** sun protection only happens on summer days. At the day change (default 01:00) the high of the daily forecast is checked. If the outdoor temperature rises above the threshold during the day, it becomes a summer day as well.
+* **Summer day:** sun protection only happens on summer days. At the day change (default 01:00) the high of the daily forecast is checked. If the outdoor temperature rises above the threshold during the day, it becomes a summer day as well, but only when the forecast low of the coming night is at least 14 °C (adjustable). A warm afternoon in spring or autumn with a cool night therefore does not start sun protection. Without a low in the forecast the summer day counts as before.
 * **Sun condition per window:** summer day AND outdoor temperature above the threshold of the window (with hold time) AND every sun sensor of the group above its threshold. All of it must be fulfilled for the sun hold time and ends immediately. After a restart it is evaluated right away; the hold time starts at the start.
+* **Heat need (optional):** with a **room temperature** per window the cover is only lowered when the room is too warm: with a thermostat (climate, e.g. from [AI Heating Assistant](https://github.com/Jumpmaster2/AI-Heating-Assistant)) from setpoint + 2 K, with a temperature sensor from 24 °C. While the chosen **air conditioner** cools, the room counts as too warm and sun protection takes load off it. While the global **heating wanted** entity is on (e.g. the heating day of AI Heating Assistant), the warmth of the sun is welcome: the cover is only lowered when the room is too warm anyway; windows without a room temperature stay up. Opening again does not depend on this, it still only follows the sun.
 * **Lowering:** when the sun is in the sector of the group and the sun condition applies, the cover moves once a day to the sun protection position. If it is already further closed it is only marked and left alone. An open window prevents the movement; a notification is sent once a day (can be switched off per window), only if a movement was really prevented. Lowering follows after the window was closed.
 * **Auto up:** when the sun leaves the sector, the cover opens again, but only if it still stands at the sun protection position (up to the tolerance above it). Covers moved elsewhere by hand stay. No auto up in the evening mode, during an override or an opening block. Can be switched off per window.
 * **Manual sun protection:** if someone lowers a cover by hand far enough while the sun shines (default at most 25 %), it counts as sun protection for today. Optionally every movement exactly onto the sun protection position counts as well.
@@ -72,7 +73,7 @@ Requires Home Assistant 2026.10 or newer.
 
 After the setup there is a **Shutter Assistant** page in the sidebar (administrators only). **Configure** at the integration (Devices & services) opens this page directly.
 
-* **Overview:** automatic on/off, summer day (forecast and threshold), start of the evening mode, vacation and restart protection. Next to it the **sun compass** with the current position of the sun and the sectors of the groups, notes (e.g. configured entities that do not exist, or a deleted group) and all windows with status, position, window contact and last reason. A running override can be **ended** right there. The **sun condition check** shows every part of the condition per window with the current value and threshold: summer day, outdoor temperature, every sun sensor, hold time (with the time it will be met) and whether the sun is in the sector.
+* **Overview:** automatic on/off, summer day (forecast and threshold), start of the evening mode, vacation and restart protection. Next to it the **sun compass** with the current position of the sun and the sectors of the groups, notes (e.g. configured entities that do not exist, or a deleted group) and all windows with status, position, window contact and last reason. A running override can be **ended** right there. The **sun condition check** shows every part of the condition per window with the current value and threshold: summer day (with the night low when the outdoor temperature started it), outdoor temperature, every sun sensor, room, air conditioner, heating wanted, hold time (with the time it will be met) and whether the sun is in the sector.
 * **Windows:** all windows as a table, click to edit. The editor shows the settings by topic in cards (window, sun protection, detect manual sun protection, evening, override, ventilation & vacation, morning opening, additional conditions). Only the fields that apply are shown: thresholds only for the sensor types of the group, own evening times only when switched on, for the morning opening only the fields of the chosen mode. **Duplicate** creates a new window with the same settings; only cover and window contacts are chosen again.
 * **Groups:** directions of the sun with the current values of their sensors and the windows using them. While editing, the compass shows the sector of the group right away.
 * **House in the compass** (under **General**): length of the front, depth and the direction the front faces. When all three values are set, the house appears to scale and turned in the middle of the compass. A group can then get a **wall**: the azimuth sector is set to the direction of the wall ± 90° (can be changed afterwards) and the wall is shown in the colour of the group. **Windows** appear as marks at their wall (own wall or the one of the group), coloured live by sun protection, override and evening, hollow when the window is open; a click opens the window. **Position on the wall** (1, 2, 3 …) sets the order of the windows on a wall: 1 is far left, looking out through the wall from inside; windows without a number come after.
@@ -90,6 +91,8 @@ Values are checked exactly like in the dialogs (same ranges, units and rules). T
 | Notification services | | e.g. `notify.mobile_app_phone` |
 | Workday sensor | | optional, for the morning opening (e.g. Workday integration) |
 | Summer day from | 23 °C | high of the forecast |
+| Late summer day only with a night from | 14 °C | low of the coming night, when only the outdoor temperature starts the summer day |
+| Heating wanted | | optional, e.g. `binary_sensor.…_heating_day`; on = warmth of the sun welcome |
 | Day change | 01:00 | check the forecast, reset daily markers |
 | Evening earliest, sun elevation, latest | 17:00, -4 °, 21:00 | |
 | End of the night | 03:30 | |
@@ -111,7 +114,7 @@ Values are checked exactly like in the dialogs (same ranges, units and rules). T
 **Add window** in four steps:
 
 1. **Window:** name, cover, window contacts, group (no group = no sun protection).
-2. **Sun protection:** thresholds for the sensor types of the group, outdoor temperature at least (19 °C), hold times temperature (10 min) and sun (5 min), sun protection position (10 %), tolerance for auto up (5 %), auto up, notification about an open window, manual sun protection up to (25 %), detection period (5 min), follow-up (5 min), moving onto the sun protection position counts.
+2. **Sun protection:** thresholds for the sensor types of the group, outdoor temperature at least (19 °C), hold times temperature (10 min) and sun (5 min), room temperature (thermostat: too warm from setpoint + 2 K, sensor: from 24 °C), air conditioner, sun protection position (10 %), tolerance for auto up (5 %), auto up, notification about an open window, manual sun protection up to (25 %), detection period (5 min), follow-up (5 min), moving onto the sun protection position counts.
 3. **Behaviour:** override (60 min, sunrise, evening and vacation runs despite override), additional conditions, evening (evening run, close after window closed, own evening times), ventilation (30 %, counts as closed up to 5 %, 3 s in the evening, 60 s during the day), vacation simulation.
 4. **Morning opening:** on or off, mode and period, then the settings of the mode.
 

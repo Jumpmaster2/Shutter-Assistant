@@ -24,10 +24,14 @@
         "description": "Sonnenschutz gibt es nur an Sommertagen.",
         "data": {
           "summer_threshold": "Sommertag ab Vorhersage-Höchsttemperatur",
+          "night_threshold": "Später Sommertag nur bei Nacht ab",
+          "heating_entity": "Heizbedarf",
           "day_change_time": "Tageswechsel"
         },
         "data_description": {
-          "summer_threshold": "Ohne Sommertag gibt es keinen Sonnenschutz. Tagsüber beginnt der Sommertag auch, wenn die Außentemperatur über diesen Wert steigt.",
+          "summer_threshold": "Ohne Sommertag gibt es keinen Sonnenschutz. Tagsüber beginnt der Sommertag auch, wenn die Außentemperatur über diesen Wert steigt (siehe Nacht).",
+          "night_threshold": "Wird der Tag erst durch die Außentemperatur zum Sommertag, zählt das nur, wenn der Vorhersage-Tiefstwert der kommenden Nacht mindestens so hoch ist. Kühlt es nachts ab (Frühling, Herbst), bleibt die Wärme im Haus. Ohne Tiefstwert in der Vorhersage gilt der Sommertag wie bisher.",
+          "heating_entity": "Optional, z. B. der Heiztag des AI Heating Assistant. Solange sie an ist, ist Sonnenwärme erwünscht: Sonnenschutz nur, wenn der Raum eines Fensters trotzdem zu warm ist. Fenster ohne Raumtemperatur werden dann nicht abgesenkt.",
           "day_change_time": "Prüfung der Vorhersage und Zurücksetzen der Tagesmarker für Sonnenschutz und Benachrichtigungen."
         }
       },
@@ -104,10 +108,14 @@
         "description": "Sonnenschutz gibt es nur an Sommertagen.",
         "data": {
           "summer_threshold": "Sommertag ab Vorhersage-Höchsttemperatur",
+          "night_threshold": "Später Sommertag nur bei Nacht ab",
+          "heating_entity": "Heizbedarf",
           "day_change_time": "Tageswechsel"
         },
         "data_description": {
-          "summer_threshold": "Ohne Sommertag gibt es keinen Sonnenschutz. Tagsüber beginnt der Sommertag auch, wenn die Außentemperatur über diesen Wert steigt.",
+          "summer_threshold": "Ohne Sommertag gibt es keinen Sonnenschutz. Tagsüber beginnt der Sommertag auch, wenn die Außentemperatur über diesen Wert steigt (siehe Nacht).",
+          "night_threshold": "Wird der Tag erst durch die Außentemperatur zum Sommertag, zählt das nur, wenn der Vorhersage-Tiefstwert der kommenden Nacht mindestens so hoch ist. Kühlt es nachts ab (Frühling, Herbst), bleibt die Wärme im Haus. Ohne Tiefstwert in der Vorhersage gilt der Sommertag wie bisher.",
+          "heating_entity": "Optional, z. B. der Heiztag des AI Heating Assistant. Solange sie an ist, ist Sonnenwärme erwünscht: Sonnenschutz nur, wenn der Raum eines Fensters trotzdem zu warm ist. Fenster ohne Raumtemperatur werden dann nicht abgesenkt.",
           "day_change_time": "Prüfung der Vorhersage und Zurücksetzen der Tagesmarker für Sonnenschutz und Benachrichtigungen."
         }
       },
@@ -264,6 +272,10 @@
             "lux_threshold": "Helligkeitsschwelle",
             "temperature_threshold": "Außentemperatur mindestens",
             "temperature_hold": "Haltezeit Temperatur",
+            "room_entity": "Raumtemperatur",
+            "room_margin": "Zu warm ab Sollwert plus",
+            "room_threshold": "Zu warm ab",
+            "cooling_entity": "Klimaanlage",
             "sun_hold": "Haltezeit Sonne",
             "sun_position": "Sonnenschutz-Position",
             "position_tolerance": "Toleranz für Auto-Hoch",
@@ -280,7 +292,11 @@
             "lux_threshold": "Jeder Helligkeitssensor der Gruppe muss diesen Wert erreichen.",
             "temperature_threshold": "Sonnenschutz erst ab dieser Außentemperatur.",
             "temperature_hold": "So lange muss die Außentemperatur darüber liegen. Darunter endet die Bedingung sofort.",
-            "sun_hold": "So lange müssen Sommertag, Temperatur und alle Sonnensensoren erfüllt sein. Die Bedingung endet sofort.",
+            "room_entity": "Optional: Thermostat (climate, z. B. vom AI Heating Assistant) oder Temperatursensor des Raums. Dann wird nur abgesenkt, wenn der Raum zu warm ist. Ohne Wert gilt die Bedingung als erfüllt (außer am Heiztag).",
+            "room_margin": "Bei einem Thermostat: zu warm ab dessen Sollwert plus diesem Abstand.",
+            "room_threshold": "Bei einem Temperatursensor (oder einem Thermostat ohne Sollwert): zu warm ab dieser Temperatur.",
+            "cooling_entity": "Optional: Solange diese Klimaanlage kühlt, gilt der Raum als zu warm. Der Sonnenschutz entlastet dann die Klimaanlage.",
+            "sun_hold": "So lange müssen Sommertag, Temperatur, Raum und alle Sonnensensoren erfüllt sein. Die Bedingung endet sofort.",
             "sun_position": "Einmal am Tag auf diese Position. Ein schon weiter geschlossenes Rollo bleibt, wie es ist.",
             "position_tolerance": "Auto-Hoch öffnet nur Rollos, die auf der Sonnenschutz-Position bis so viel darüber stehen. Von Hand anders gestellte Rollos bleiben.",
             "auto_up": "Wieder öffnen, wenn die Sonne den Bereich verlässt (nicht im Abendmodus).",
