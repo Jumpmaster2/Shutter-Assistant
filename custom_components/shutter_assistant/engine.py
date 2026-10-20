@@ -7,6 +7,7 @@ times, override end, daily times, sunrise, random vacation times).
 
 from __future__ import annotations
 
+import asyncio
 import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -14,6 +15,7 @@ from datetime import date, datetime, time, timedelta, tzinfo
 from typing import Any
 
 from astral import Observer
+from homeassistant.components.cover import CoverEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -61,6 +63,7 @@ from .const import (
     CONF_EVENING_LATEST,
     CONF_FOLLOW_UP_CLOSE,
     CONF_FOLLOW_UP_EARLIEST,
+    CONF_FORECAST_TYPE,
     CONF_GROUP,
     CONF_HEATING_ENTITY,
     CONF_LANGUAGE,
@@ -123,10 +126,11 @@ from .const import (
     CONF_VENT_POSITION,
     CONF_VENTILATION,
     CONF_WEATHER,
+    CONF_WEEKEND_DAYS,
+    CONF_WINDOW_DEBOUNCE,
     CONF_WINDOW_EXCEPTION,
     CONF_WINDOW_SENSORS,
     CONF_WORKDAY,
-    DEFAULTS,
     DOMAIN,
     EVENT_LOGBOOK,
     GROUP_DEFAULTS,
@@ -138,9 +142,8 @@ from .const import (
     SUBENTRY_WINDOW,
     THRESHOLD_KEYS,
     TRIGGER_COMMAND,
-    WINDOW_CLOSED_DEBOUNCE,
-    WINDOW_DEFAULTS,
 )
+from .logic import forecast as fc
 from .logic import morning as mo
 from .logic import sun as sunlib
 from .logic import window as rules
@@ -159,15 +162,17 @@ from .logic.evening import EveningSettings, evening_day, evening_end, evening_st
 from .logic.override import MOVING, CommandTracker, MovementWatch, is_manual, override_until
 from .logic.vacation import random_position, random_time
 from .messages import resolve_language, text
+from .units import defaults, temperature_unit, window_defaults
 
 type ShutterConfigEntry = ConfigEntry[ShutterEngine]
 
 INVALID = (STATE_UNAVAILABLE, STATE_UNKNOWN)
 # A failed forecast is retried after this time (the last known value stays valid).
 FORECAST_RETRY = timedelta(minutes=30)
-# CoverEntityFeature.SET_POSITION (not imported to keep the integration free of
-# platform dependencies)
-SET_POSITION = 4
+# A forecast request that takes longer counts as failed (seconds).
+FORECAST_TIMEOUT = 30
+ISSUE_MISSING_GROUP = "missing_group_"
+ISSUE_FORECAST = "forecast_unsupported"
 
 
 def parse_time(value: Any, fallback: str = "00:00:00") -> time:
@@ -247,6 +252,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
 
     def __init__(self, hass: HomeAssistant, entry: ShutterConfigEntry) -> None:
         super().__init__(hass, LOGGER, config_entry=entry, name=NAME)
+        # Temperatures (sensors, forecast, thresholds) are in the unit of the instance.
+        self.temperature_unit = temperature_unit(hass)
+        self._defaults = defaults(self.temperature_unit)
+        self._window_defaults = window_defaults(self.temperature_unit)
+        self._shutdown = False
         self.global_device_id: str | None = None
         self.groups: dict[str, Group] = {}
         self.windows: dict[str, Window] = {}
@@ -274,10 +284,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
 
     @property
     def opts(self) -> dict[str, Any]:
-        return {**DEFAULTS, **self.config_entry.options}
+        return {**self._defaults, **self.config_entry.options}
 
     def opt(self, key: str) -> Any:
-        return self.opts.get(key, DEFAULTS.get(key))
+        return self.opts.get(key, self._defaults.get(key))
 
     @property
     def language(self) -> str:
@@ -317,7 +327,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 self.windows[sub_id] = self._build_window(sub_id, sub.title, dict(sub.data))
 
     def _build_window(self, window_id: str, title: str, data: dict[str, Any]) -> Window:
-        conf = {**WINDOW_DEFAULTS, **data}
+        conf = {**self._window_defaults, **data}
         morning_settings = None
         if conf[CONF_MORNING]:
             morning_settings = mo.MorningSettings(
@@ -410,7 +420,12 @@ class ShutterEngine(DataUpdateCoordinator[None]):
 
         Also without a night low (e.g. stored by a version before 0.3.0), so the
         warm night check applies today and not only after the next day change.
+        The restart protection counts from now on: devices report only after the start.
         """
+        if self.startup_until is not None:
+            delay = float(self.opt(CONF_STARTUP_DELAY))
+            self.startup_until = dt_util.now() + timedelta(minutes=delay)
+            self._schedule("startup", self.startup_until, self._startup_finished)
         if self.forecast_day != self._sun_day(dt_util.now()) or self.forecast_night_low is None:
             await self.async_update_forecast()
 
@@ -472,6 +487,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self._store.async_delay_save(self._data_to_save, 5)
 
     async def async_shutdown(self) -> None:
+        self._shutdown = True
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
@@ -482,9 +498,22 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         await super().async_shutdown()
 
     def _update_issues(self) -> None:
+        wanted = {
+            f"{ISSUE_MISSING_GROUP}{win.window_id}"
+            for win in self.windows.values()
+            if win.group_id and win.group_id not in self.groups
+        }
+        # also the issues of windows deleted in the meantime
+        for domain, issue_id in list(ir.async_get(self.hass).issues):
+            if (
+                domain == DOMAIN
+                and issue_id.startswith(ISSUE_MISSING_GROUP)
+                and issue_id not in wanted
+            ):
+                ir.async_delete_issue(self.hass, DOMAIN, issue_id)
         for win in self.windows.values():
-            issue_id = f"missing_group_{win.window_id}"
-            if win.group_id and win.group_id not in self.groups:
+            issue_id = f"{ISSUE_MISSING_GROUP}{win.window_id}"
+            if issue_id in wanted:
                 ir.async_create_issue(
                     self.hass,
                     DOMAIN,
@@ -494,8 +523,6 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     translation_key="missing_group",
                     translation_placeholders={"window": win.name},
                 )
-            else:
-                ir.async_delete_issue(self.hass, DOMAIN, issue_id)
 
     # ------------------------------------------------------------------ listeners
 
@@ -507,8 +534,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     async_track_state_change_event(self.hass, sorted(entities), handler)
                 )
 
-        outdoor = self.opt(CONF_OUTDOOR_TEMP)
-        self._outdoor_last = as_float(self._state_value(outdoor))
+        outdoor = self._outdoor_entity
+        self._outdoor_last = self.outdoor_temperature
         track({outdoor} if outdoor else set(), self._on_outdoor)
         sensors = {e for g in self.groups.values() for lst in g.sensors.values() for e in lst}
         track(sensors, self._on_sun_sensor)
@@ -567,7 +594,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         if when is not None and key in self._timers and self._timer_due.get(key) == when:
             return
         self._cancel(key)
-        if when is None:
+        if when is None or self._shutdown:
             return
 
         @callback
@@ -592,6 +619,20 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     def _state_value(self, entity_id: str | None) -> str | None:
         state = self._state(entity_id)
         return state.state if state else None
+
+    @property
+    def _outdoor_entity(self) -> str | None:
+        """Outdoor temperature sensor, or the weather entity without one."""
+        return self.opt(CONF_OUTDOOR_TEMP) or self.opt(CONF_WEATHER) or None
+
+    @property
+    def outdoor_temperature(self) -> float | None:
+        state = self._state(self._outdoor_entity)
+        if state is None or state.state in INVALID:
+            return None
+        if state.domain == "weather":
+            return as_float(state.attributes.get("temperature"))
+        return as_float(state.state)
 
     def _position(self, win: Window) -> int | None:
         state = self._state(win.cover)
@@ -727,7 +768,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         """Update the time based conditions of a window. True if a condition changed."""
         ts = now.timestamp()
         group = self.groups.get(win.group_id or "")
-        outdoor = self._state_value(self.opt(CONF_OUTDOOR_TEMP))
+        outdoor = self.outdoor_temperature
         win.temp_hold.update(at_least(outdoor, float(win.conf[CONF_TEMP_THRESHOLD])), ts)
         temp_ok = win.temp_hold.state(ts)
         sens = group is not None and sensors_ok(self._sensor_values(group), self._thresholds(win))
@@ -887,7 +928,9 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             "cooling": self.cooling(win),
             "heating_entity": self.opt(CONF_HEATING_ENTITY),
             "heating_day": self.heating_day,
-            "temperature_sensor": self.opt(CONF_OUTDOOR_TEMP),
+            "temperature_sensor": self._outdoor_entity,
+            "outdoor_temperature": self.outdoor_temperature,
+            "temperature_unit": self.temperature_unit,
             "temperature_threshold": float(win.conf[CONF_TEMP_THRESHOLD]),
             "temperature_hold": float(win.conf[CONF_TEMP_HOLD]),
             "temperature_ok": self.temp_ok(win),
@@ -956,7 +999,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         for target, _reason in moves:
             self._start_move(win, target)
         if notify:
-            self.hass.async_create_task(self._async_notify(win))
+            self._create_task(self._async_notify(win), "notify")
         self._save()
         self.async_update_listeners()
 
@@ -984,7 +1027,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             service = "open_cover"
         elif target <= rules.CLOSED:
             service = "close_cover"
-        elif features & SET_POSITION:
+        elif features & CoverEntityFeature.SET_POSITION:
             service = "set_cover_position"
             data["position"] = target
         else:
@@ -992,7 +1035,14 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             return
         context = Context()
         self.tracker.register(win.cover, target, context.id, self._now_ts)
-        self.hass.async_create_task(self._async_call("cover", service, data, context))
+        self._create_task(self._async_call("cover", service, data, context), "cover")
+
+    def _create_task(self, coro: Any, name: str) -> None:
+        """Task bound to the config entry (waited for when the entry unloads)."""
+        if self._shutdown:
+            coro.close()
+            return
+        self.config_entry.async_create_task(self.hass, coro, f"{DOMAIN} {name}")
 
     async def _async_call(
         self, domain: str, service: str, data: dict[str, Any], context: Context | None = None
@@ -1009,6 +1059,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             domain, _, service = str(target).partition(".")
             if not service:
                 domain, service = "notify", domain
+            if domain != "notify":
+                # only notification services (others are refused when saving)
+                LOGGER.warning("%s is not a notification service, skipped", target)
+                continue
             await self._async_call(domain, service, {"title": title, "message": message})
 
     # ------------------------------------------------------------------ evaluation
@@ -1034,10 +1088,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             self.async_update_listeners()
 
     @callback
-    def _on_outdoor(self, event: Event[EventStateChangedData]) -> None:
+    def _on_outdoor(self, _event: Event[EventStateChangedData]) -> None:
         now = dt_util.now()
-        new_state = event.data["new_state"]
-        value = as_float(new_state.state) if new_state else None
+        # sensor state or the temperature attribute of the weather entity
+        value = self.outdoor_temperature
         threshold = float(self.opt(CONF_SUMMER_THRESHOLD))
         previous = self._outdoor_last
         self._outdoor_last = value
@@ -1133,7 +1187,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 real = old is not None and old.state not in INVALID
                 self._schedule(
                     f"{win.window_id}:close",
-                    now + timedelta(seconds=WINDOW_CLOSED_DEBOUNCE),
+                    now + timedelta(seconds=float(self.opt(CONF_WINDOW_DEBOUNCE))),
                     lambda now, wid=win.window_id, r=real: self._window_closed(wid, r, now),
                 )
 
@@ -1243,7 +1297,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     situation = self._situation(win, now)
                 self._apply(win, rules.sun_position_reached(win.rules, situation), now)
                 self._evaluate(win, now)
-            self.async_update_listeners()
+        self.async_update_listeners()
 
     def _start_override(self, win: Window, now: datetime) -> None:
         duration = float(win.conf[CONF_OVERRIDE_DURATION])
@@ -1398,37 +1452,69 @@ class ShutterEngine(DataUpdateCoordinator[None]):
 
     @callback
     def _on_day_change(self, now: datetime) -> None:
-        self.hass.async_create_task(self.async_update_forecast())
+        self._create_task(self.async_update_forecast(), "forecast")
+
+    def forecast_kind(self) -> str | None:
+        """Kind of forecast to request (None: the weather entity has none)."""
+        state = self._state(self.opt(CONF_WEATHER))
+        features = None
+        if state is not None and ATTR_SUPPORTED_FEATURES in state.attributes:
+            features = int(state.attributes.get(ATTR_SUPPORTED_FEATURES) or 0)
+        return fc.choose(str(self.opt(CONF_FORECAST_TYPE)), features)
+
+    def _forecast_issue(self, weather: str, unsupported: bool) -> None:
+        if unsupported:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                ISSUE_FORECAST,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key=ISSUE_FORECAST,
+                translation_placeholders={"weather": weather},
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, ISSUE_FORECAST)
 
     async def async_update_forecast(self) -> None:
-        """Daily forecast: today's high decides about the summer day."""
+        """Forecast: today's high decides about the summer day."""
         weather = self.opt(CONF_WEATHER)
         now = dt_util.now()
-        if not weather:
+        if not weather or self._shutdown:
+            ir.async_delete_issue(self.hass, DOMAIN, ISSUE_FORECAST)
             return
         value = None
         night_low = None
+        kind = self.forecast_kind() if self._state(weather) is not None else None
         if self._state(weather) is not None:
+            self._forecast_issue(weather, kind is None)
+        if kind is not None:
             try:
-                response = await self.hass.services.async_call(
-                    "weather",
-                    "get_forecasts",
-                    {ATTR_ENTITY_ID: weather, "type": "daily"},
-                    blocking=True,
-                    return_response=True,
-                )
+                async with asyncio.timeout(FORECAST_TIMEOUT):
+                    response = await self.hass.services.async_call(
+                        "weather",
+                        "get_forecasts",
+                        {ATTR_ENTITY_ID: weather, "type": kind},
+                        blocking=True,
+                        return_response=True,
+                    )
                 forecast = (response or {}).get(weather, {}).get("forecast") or []
-                if forecast:
-                    value = as_float(forecast[0].get("temperature"))
-                    night_low = _night_low(forecast)
+                value, night_low = fc.summarize(forecast, kind, self._sun_day(now), self.tz)
+                LOGGER.debug(
+                    "Forecast %s of %s: high %s, night low %s", kind, weather, value, night_low
+                )
+            except TimeoutError:
+                LOGGER.warning("Forecast of %s timed out", weather)
             except (HomeAssistantError, ValueError, AttributeError) as err:
                 LOGGER.warning("Forecast of %s not available: %s", weather, err)
+        if self._shutdown:
+            return
         if value is None:
             LOGGER.info("No forecast from %s, keeping the last value and retrying", weather)
             self._schedule(
                 "forecast_retry",
                 now + FORECAST_RETRY,
-                lambda _now: self.hass.async_create_task(self.async_update_forecast()),
+                lambda _now: self._create_task(self.async_update_forecast(), "forecast"),
             )
         else:
             # A later fetch on the same day only adds the night low: during the day
@@ -1610,7 +1696,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             day,
             self.tz,
             settings,
-            workday=mo.is_workday(day, self._state_value(self.opt(CONF_WORKDAY))),
+            workday=mo.is_workday(
+                day,
+                self._state_value(self.opt(CONF_WORKDAY)),
+                self.opt(CONF_WEEKEND_DAYS) or (),
+            ),
             sunrise=sunlib.sunrise(self.observer, day, self.tz),
             elevation_time=sunlib.time_at_elevation(
                 self.observer, day, settings.sun_elevation, True, self.tz
@@ -1742,18 +1832,6 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 for wid, win in self.windows.items()
             },
         }
-
-
-def _night_low(forecast: list[dict[str, Any]]) -> float | None:
-    """Forecast low of the coming night.
-
-    The low of tomorrow is the early morning after this night; without it the
-    low of today.
-    """
-    for day in forecast[1:2] + forecast[:1]:
-        if (low := as_float(day.get("templow"))) is not None:
-            return low
-    return None
 
 
 def _iso(value: date | datetime | None) -> str | None:

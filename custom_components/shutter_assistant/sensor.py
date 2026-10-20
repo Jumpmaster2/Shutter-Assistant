@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
-from homeassistant.const import UnitOfTemperature
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.const import MATCH_ALL, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -34,10 +34,14 @@ class ForecastMax(GlobalEntity, SensorEntity):
     """Today's forecast high used for the summer day."""
 
     _attr_device_class = SensorDeviceClass.TEMPERATURE
-    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, engine: ShutterEngine) -> None:
         super().__init__(engine, "forecast_max")
+        # the forecast comes in the unit of the instance
+        self._attr_native_unit_of_measurement = engine.temperature_unit
 
     @property
     def native_value(self) -> float | None:
@@ -49,6 +53,8 @@ class Status(WindowEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = STATUSES
+    # control values for the panel and own cards, not worth keeping in the history
+    _unrecorded_attributes = frozenset({MATCH_ALL})
 
     def __init__(self, engine: ShutterEngine, window_id: str) -> None:
         super().__init__(engine, window_id, "status")
@@ -64,6 +70,8 @@ class Status(WindowEntity, SensorEntity):
 
 class LastReason(WindowEntity, SensorEntity):
     """The last movement or decision and why."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, engine: ShutterEngine, window_id: str) -> None:
         super().__init__(engine, window_id, "last_reason")

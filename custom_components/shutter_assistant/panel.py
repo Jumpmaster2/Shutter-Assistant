@@ -13,13 +13,15 @@ PANEL_COMPONENT = "shutter-assistant-panel"
 STATIC_URL = "/shutter_assistant_static"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 DATA_STATIC = f"{DOMAIN}_static_registered"
+DATA_SIDEBAR = f"{DOMAIN}_panel_in_sidebar"
 
 
-async def async_register_panel(hass: HomeAssistant, entry_id: str) -> None:
+async def async_register_panel(hass: HomeAssistant, entry_id: str, sidebar: bool = True) -> None:
     """Register the panel (only when the frontend runs, not in tests).
 
     ``config_panel_domain`` makes the configure button of the integration open
-    the panel instead of the options dialog.
+    the panel instead of the options dialog. Without ``sidebar`` the panel has
+    no entry in the sidebar but stays reachable from the integration page.
     """
     if "frontend" not in hass.config.components or hass.http is None:
         return
@@ -32,19 +34,22 @@ async def async_register_panel(hass: HomeAssistant, entry_id: str) -> None:
         )
         hass.data[DATA_STATIC] = True
     if frontend.async_panel_exists(hass, PANEL_URL_PATH):
-        return
+        if hass.data.get(DATA_SIDEBAR) == sidebar:
+            return
+        frontend.async_remove_panel(hass, PANEL_URL_PATH, warn_if_unknown=False)
     version = await hass.async_add_executor_job(_version)
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=PANEL_URL_PATH,
         webcomponent_name=PANEL_COMPONENT,
         module_url=f"{STATIC_URL}/panel.js?v={version}",
-        sidebar_title=NAME,
-        sidebar_icon="mdi:window-shutter-auto",
+        sidebar_title=NAME if sidebar else None,
+        sidebar_icon="mdi:window-shutter-auto" if sidebar else None,
         require_admin=True,
         config={"entry_id": entry_id, "version": version},
         config_panel_domain=DOMAIN,
     )
+    hass.data[DATA_SIDEBAR] = sidebar
 
 
 def async_unregister_panel(hass: HomeAssistant) -> None:
@@ -54,6 +59,7 @@ def async_unregister_panel(hass: HomeAssistant) -> None:
 
     if frontend.async_panel_exists(hass, PANEL_URL_PATH):
         frontend.async_remove_panel(hass, PANEL_URL_PATH, warn_if_unknown=False)
+    hass.data.pop(DATA_SIDEBAR, None)
 
 
 def _version() -> str:

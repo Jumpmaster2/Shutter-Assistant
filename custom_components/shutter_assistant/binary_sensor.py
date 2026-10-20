@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.const import MATCH_ALL, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -94,6 +95,10 @@ class Override(WindowEntity, BinarySensorEntity):
 
 class SunCondition(WindowEntity, BinarySensorEntity):
     """Sun condition met (summer day, temperature and sun sensors, including hold times)."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    # many control values that change often: not kept in the history
+    _unrecorded_attributes = frozenset({MATCH_ALL})
 
     def __init__(self, engine: ShutterEngine, window_id: str) -> None:
         super().__init__(engine, window_id, "sun_condition")
