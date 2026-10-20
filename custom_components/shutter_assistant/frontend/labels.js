@@ -19,7 +19,7 @@ export const LABELS = {
   ],
   "close_trigger_active_states": [
    "Aktiv-Zustände",
-   ""
+   "Zustände, in denen ein Schließ-Auslöser als aktiv gilt (z. B. on, playing beim Fernseher)."
   ],
   "close_trigger_entities": [
    "Schließ-Auslöser",
@@ -27,19 +27,19 @@ export const LABELS = {
   ],
   "close_trigger_max_lock": [
    "Zyklus höchstens",
-   ""
+   "Spätestens nach dieser Zeit beginnt ein neuer Zyklus, auch wenn die Auslöser die ganze Zeit aktiv waren."
   ],
   "close_trigger_min_position": [
    "Nur wenn weiter offen als",
-   ""
+   "Schließt nur, wenn das Rollo weiter offen steht als diese Position."
   ],
   "close_trigger_off_delay": [
    "Inaktiv nach",
-   ""
+   "So lange müssen alle Auslöser inaktiv sein, bis der Zyklus endet und ein neues Einschalten wieder schließt."
   ],
   "close_trigger_on_delay": [
    "Aktiv nach",
-   ""
+   "So lange muss ein Auslöser aktiv sein, bevor das Rollo schließt (kurzes Einschalten zählt nicht)."
   ],
   "closed_position": [
    "Gilt als geschlossen bis",
@@ -85,13 +85,17 @@ export const LABELS = {
    "Nachziehen ab",
    "Ein am Abend geschlossenes Fenster fährt das Rollo erst ab dieser Uhrzeit zu."
   ],
+  "forecast_type": [
+   "Vorhersage-Art",
+   "Automatisch nimmt die erste Art, die die Wetter-Entität kann (täglich, zweimal täglich, stündlich). Aus stündlichen Werten werden Tageshöchst- und Nachttiefstwert berechnet."
+  ],
   "group": [
    "Gruppe",
    "Himmelsrichtung. Ohne Gruppe hat das Fenster keinen Sonnenschutz."
   ],
   "heating_entity": [
    "Heizbedarf",
-   "Optional, z. B. der Heiztag des AI Heating Assistant. Solange sie an ist, ist Sonnenwärme erwünscht: Sonnenschutz nur, wenn der Raum eines Fensters trotzdem zu warm ist. Fenster ohne Raumtemperatur werden dann nicht abgesenkt."
+   "Optional, z. B. ein input_boolean „Heizperiode“ oder der Heiztag einer Heizungssteuerung. Solange sie an ist, ist Sonnenwärme erwünscht: Sonnenschutz nur, wenn der Raum eines Fensters trotzdem zu warm ist. Fenster ohne Raumtemperatur werden dann nicht abgesenkt."
   ],
   "language": [
    "Sprache der Meldungen",
@@ -123,11 +127,11 @@ export const LABELS = {
   ],
   "morning_earliest": [
    "Frühestens",
-   ""
+   "Vorher öffnet das Rollo nie, auch wenn der Auslöser früher kommt."
   ],
   "morning_enabled": [
    "Morgenöffnung",
-   ""
+   "Das Rollo morgens automatisch öffnen."
   ],
   "morning_latest": [
    "Spätestens",
@@ -135,7 +139,7 @@ export const LABELS = {
   ],
   "morning_lux_hold": [
    "Haltezeit",
-   ""
+   "So lange muss es hell genug sein, bevor das Rollo öffnet."
   ],
   "morning_lux_threshold": [
    "Helligkeit",
@@ -143,7 +147,7 @@ export const LABELS = {
   ],
   "morning_mode": [
    "Modus",
-   ""
+   "Wodurch die Morgenöffnung ausgelöst wird; die Einstellungen dazu folgen im nächsten Schritt."
   ],
   "morning_position": [
    "Zielposition",
@@ -155,11 +159,11 @@ export const LABELS = {
   ],
   "morning_sun_event": [
    "Ereignis",
-   ""
+   "Sonnenaufgang oder das Erreichen einer Sonnenhöhe."
   ],
   "morning_sun_offset": [
    "Versatz",
-   ""
+   "Minuten vor (negativ) oder nach dem Ereignis."
   ],
   "morning_sun_position": [
    "Direkt auf Sonnenschutz, falls nötig",
@@ -167,11 +171,11 @@ export const LABELS = {
   ],
   "morning_time_weekend": [
    "Wochenende und Feiertage",
-   ""
+   "Uhrzeit am Wochenende und an Feiertagen (Feiertage nur mit Werktag-Sensor)."
   ],
   "morning_time_workday": [
    "Werktags",
-   ""
+   "Uhrzeit an Werktagen (Werktag-Sensor oder Wochenendtage)."
   ],
   "morning_trigger_entity": [
    "Auslöser-Entität",
@@ -199,7 +203,7 @@ export const LABELS = {
   ],
   "notify_services": [
    "Benachrichtigungsdienste",
-   "Erhalten eine Nachricht, wenn ein offenes Fenster den Sonnenschutz verhindert (z. B. notify.mobile_app_handy)."
+   "Erhalten eine Nachricht, wenn ein offenes Fenster den Sonnenschutz verhindert (nur notify-Dienste, z. B. notify.mobile_app_handy)."
   ],
   "open_block_entity": [
    "Öffnungssperre",
@@ -207,11 +211,11 @@ export const LABELS = {
   ],
   "open_block_free_states": [
    "Freigabe-Zustände",
-   ""
+   "Zustände der Öffnungssperre, in denen trotzdem geöffnet wird (z. B. off, standby)."
   ],
   "outdoor_temperature": [
    "Außentemperatur-Sensor",
-   "Für den Sommertag und die Temperaturbedingung jedes Fensters."
+   "Für den Sommertag und die Temperaturbedingung jedes Fensters. Ohne Sensor wird die aktuelle Temperatur der Wetter-Entität verwendet (mindestens eins von beiden)."
   ],
   "override_duration": [
    "Dauer",
@@ -223,7 +227,7 @@ export const LABELS = {
   ],
   "override_sunrise_reset": [
    "Auch bei Sonnenaufgang beenden",
-   ""
+   "Die Übersteuerung endet zusätzlich beim nächsten Sonnenaufgang, auch wenn die Dauer noch läuft."
   ],
   "override_trigger": [
    "Übersteuerung beginnt",
@@ -235,7 +239,7 @@ export const LABELS = {
   ],
   "pv_sensors": [
    "PV-Leistungssensoren",
-   "z. B. der Eingang eines Balkonkraftwerks in diese Richtung (W)."
+   "Leistung einer PV-Anlage oder eines Moduls in diese Richtung (W)."
   ],
   "pv_threshold": [
    "PV-Schwelle",
@@ -243,7 +247,7 @@ export const LABELS = {
   ],
   "radiation_sensors": [
    "Strahlungssensoren",
-   "z. B. Direktstrahlung von Open-Meteo (W/m²)."
+   "Sonnenstrahlung in W/m², z. B. von einem Wetterdienst oder einer Wetterstation."
   ],
   "radiation_threshold": [
    "Strahlungsschwelle",
@@ -251,7 +255,7 @@ export const LABELS = {
   ],
   "room_entity": [
    "Raumtemperatur",
-   "Optional: Thermostat (climate, z. B. vom AI Heating Assistant) oder Temperatursensor des Raums. Dann wird nur abgesenkt, wenn der Raum zu warm ist. Ohne Wert gilt die Bedingung als erfüllt (außer am Heiztag)."
+   "Optional: Thermostat (climate) oder Temperatursensor des Raums. Dann wird nur abgesenkt, wenn der Raum zu warm ist. Ohne Wert gilt die Bedingung als erfüllt (außer am Heiztag)."
   ],
   "room_margin": [
    "Zu warm ab Sollwert plus",
@@ -260,6 +264,10 @@ export const LABELS = {
   "room_threshold": [
    "Zu warm ab",
    "Bei einem Temperatursensor (oder einem Thermostat ohne Sollwert): zu warm ab dieser Temperatur."
+  ],
+  "show_panel": [
+   "Dashboard in der Seitenleiste",
+   "Aus: Das Dashboard verschwindet aus der Seitenleiste, bleibt aber über „Einstellungen“ bei der Integration erreichbar."
   ],
   "startup_delay": [
    "Neustart-Schutz",
@@ -291,7 +299,7 @@ export const LABELS = {
   ],
   "vacation_entities": [
    "Urlaubs-Entitäten",
-   "Urlaub ist aktiv, solange eine davon an ist (z. B. derselbe Helfer wie für die Heizung)."
+   "Urlaub ist aktiv, solange eine davon an ist (z. B. ein input_boolean „Urlaub“ oder ein Kalender)."
   ],
   "vacation_evening_start": [
    "Urlaub abends ab",
@@ -327,15 +335,23 @@ export const LABELS = {
   ],
   "ventilation_delay_evening": [
    "Verzögerung abends",
-   ""
+   "Im Abendmodus fährt das Rollo nach dieser kurzen Zeit auf die Lüftungsposition."
   ],
   "ventilation_position": [
    "Lüftungsposition",
-   ""
+   "Position beim Lüften (100 % = offen)."
   ],
   "weather": [
    "Wetter-Entität",
    "Ihre Tagesvorhersage entscheidet beim Tageswechsel, ob heute ein Sommertag ist."
+  ],
+  "weekend_days": [
+   "Wochenendtage",
+   "Nur ohne Werktag-Sensor: an diesen Tagen gilt die Wochenend-Uhrzeit der Morgenöffnung."
+  ],
+  "window_closed_delay": [
+   "Fenster gilt als geschlossen nach",
+   "Ein Fensterkontakt muss so lange „zu“ melden, bevor Nachziehen, Sonnenschutz oder Schließ-Auslöser greifen (gegen Prellen beim Schließen)."
   ],
   "window_exception_entity": [
    "Fenster-Ausnahme",
@@ -347,7 +363,7 @@ export const LABELS = {
   ],
   "workday_entity": [
    "Werktag-Sensor",
-   "Optional, für die Morgenöffnung nach Uhrzeit (z. B. Workday-Integration). Ohne Sensor gelten Montag bis Freitag als Werktage."
+   "Optional, für die Morgenöffnung nach Uhrzeit (z. B. Workday-Integration, berücksichtigt Feiertage). Ohne Sensor entscheiden die Wochenendtage."
   ]
  },
  "en": {
@@ -369,7 +385,7 @@ export const LABELS = {
   ],
   "close_trigger_active_states": [
    "Active states",
-   ""
+   "States in which a close trigger counts as active (e.g. on, playing for a TV)."
   ],
   "close_trigger_entities": [
    "Close trigger",
@@ -377,19 +393,19 @@ export const LABELS = {
   ],
   "close_trigger_max_lock": [
    "Cycle at most",
-   ""
+   "After this time at the latest a new cycle starts, even if the triggers were active all the time."
   ],
   "close_trigger_min_position": [
    "Only if open more than",
-   ""
+   "Only closes when the cover is open further than this position."
   ],
   "close_trigger_off_delay": [
    "Inactive after",
-   ""
+   "All triggers must be inactive this long before the cycle ends and switching on closes again."
   ],
   "close_trigger_on_delay": [
    "Active after",
-   ""
+   "A trigger must be active this long before the cover closes (switching on briefly does not count)."
   ],
   "closed_position": [
    "Counts as closed up to",
@@ -435,13 +451,17 @@ export const LABELS = {
    "Close after window closed, from",
    "A window closed in the evening closes the cover only after this time."
   ],
+  "forecast_type": [
+   "Kind of forecast",
+   "Automatic takes the first kind the weather entity supports (daily, twice daily, hourly). From hourly values the high of the day and the low of the night are calculated."
+  ],
   "group": [
    "Group",
    "Direction of the sun. Without a group the window has no sun protection."
   ],
   "heating_entity": [
    "Heating wanted",
-   "Optional, e.g. the heating day of AI Heating Assistant. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are not lowered then."
+   "Optional, e.g. an input_boolean \"heating season\" or the heating day of a heating control. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are then not lowered."
   ],
   "language": [
    "Language of messages",
@@ -473,11 +493,11 @@ export const LABELS = {
   ],
   "morning_earliest": [
    "At the earliest",
-   ""
+   "The cover never opens before this time, even if the trigger comes earlier."
   ],
   "morning_enabled": [
    "Morning opening",
-   ""
+   "Open the cover automatically in the morning."
   ],
   "morning_latest": [
    "At the latest",
@@ -485,7 +505,7 @@ export const LABELS = {
   ],
   "morning_lux_hold": [
    "Hold time",
-   ""
+   "It must be bright enough this long before the cover opens."
   ],
   "morning_lux_threshold": [
    "Brightness",
@@ -493,7 +513,7 @@ export const LABELS = {
   ],
   "morning_mode": [
    "Mode",
-   ""
+   "What starts the morning opening; its settings follow in the next step."
   ],
   "morning_position": [
    "Target position",
@@ -505,11 +525,11 @@ export const LABELS = {
   ],
   "morning_sun_event": [
    "Event",
-   ""
+   "Sunrise or the sun reaching an elevation."
   ],
   "morning_sun_offset": [
    "Offset",
-   ""
+   "Minutes before (negative) or after the event."
   ],
   "morning_sun_position": [
    "Directly to sun protection if needed",
@@ -517,11 +537,11 @@ export const LABELS = {
   ],
   "morning_time_weekend": [
    "Weekend and holidays",
-   ""
+   "Time on weekends and public holidays (holidays only with a workday sensor)."
   ],
   "morning_time_workday": [
    "Workdays",
-   ""
+   "Time on workdays (workday sensor or weekend days)."
   ],
   "morning_trigger_entity": [
    "Trigger entity",
@@ -549,7 +569,7 @@ export const LABELS = {
   ],
   "notify_services": [
    "Notification services",
-   "Get a message when an open window prevents the sun protection (e.g. notify.mobile_app_phone)."
+   "Get a message when an open window prevents sun protection (notify services only, e.g. notify.mobile_app_phone)."
   ],
   "open_block_entity": [
    "Opening block",
@@ -557,11 +577,11 @@ export const LABELS = {
   ],
   "open_block_free_states": [
    "Free states",
-   ""
+   "States of the opening block in which opening is still allowed (e.g. off, standby)."
   ],
   "outdoor_temperature": [
    "Outdoor temperature sensor",
-   "Used for the summer day and the temperature condition of every window."
+   "For the summer day and the temperature condition of every window. Without a sensor the current temperature of the weather entity is used (at least one of both)."
   ],
   "override_duration": [
    "Duration",
@@ -573,7 +593,7 @@ export const LABELS = {
   ],
   "override_sunrise_reset": [
    "Also end at sunrise",
-   ""
+   "The override also ends at the next sunrise, even if the duration is still running."
   ],
   "override_trigger": [
    "Override starts",
@@ -585,7 +605,7 @@ export const LABELS = {
   ],
   "pv_sensors": [
    "PV power sensors",
-   "e.g. the input of a balcony power plant facing this direction (W)."
+   "Power of a solar system or panel facing this direction (W)."
   ],
   "pv_threshold": [
    "PV threshold",
@@ -593,7 +613,7 @@ export const LABELS = {
   ],
   "radiation_sensors": [
    "Radiation sensors",
-   "e.g. direct radiation from Open-Meteo (W/m²)."
+   "Solar radiation in W/m², e.g. from a weather service or a weather station."
   ],
   "radiation_threshold": [
    "Radiation threshold",
@@ -601,7 +621,7 @@ export const LABELS = {
   ],
   "room_entity": [
    "Room temperature",
-   "Optional: thermostat (climate, e.g. from AI Heating Assistant) or temperature sensor of the room. Then the cover is only lowered when the room is too warm. Without a value the condition counts as met (except on a heating day)."
+   "Optional: thermostat (climate) or temperature sensor of the room. Then the cover is only lowered when the room is too warm. Without a value the condition counts as met (except on a heating day)."
   ],
   "room_margin": [
    "Too warm from setpoint plus",
@@ -610,6 +630,10 @@ export const LABELS = {
   "room_threshold": [
    "Too warm from",
    "With a temperature sensor (or a thermostat without a setpoint): too warm from this temperature."
+  ],
+  "show_panel": [
+   "Dashboard in the sidebar",
+   "Off: the dashboard disappears from the sidebar but stays reachable with \"Configure\" at the integration."
   ],
   "startup_delay": [
    "Restart protection",
@@ -641,7 +665,7 @@ export const LABELS = {
   ],
   "vacation_entities": [
    "Vacation entities",
-   "Vacation is active while one of them is on (e.g. the same helper as for the heating)."
+   "Vacation is active while one of them is on (e.g. an input_boolean \"vacation\" or a calendar)."
   ],
   "vacation_evening_start": [
    "Vacation evening from",
@@ -677,15 +701,23 @@ export const LABELS = {
   ],
   "ventilation_delay_evening": [
    "Delay in the evening",
-   ""
+   "In the evening mode the cover moves to the ventilation position after this short time."
   ],
   "ventilation_position": [
    "Ventilation position",
-   ""
+   "Position for ventilation (100 % = open)."
   ],
   "weather": [
    "Weather entity",
    "Its daily forecast decides at the day change whether today is a summer day."
+  ],
+  "weekend_days": [
+   "Weekend days",
+   "Only without a workday sensor: on these days the weekend time of the morning opening applies."
+  ],
+  "window_closed_delay": [
+   "Window counts as closed after",
+   "A window contact must report closed this long before closing after the window, sun protection or the close trigger act (against bouncing contacts)."
   ],
   "window_exception_entity": [
    "Window exception",
@@ -697,12 +729,18 @@ export const LABELS = {
   ],
   "workday_entity": [
    "Workday sensor",
-   "Optional, for the morning opening by time (e.g. the Workday integration). Without it Monday to Friday are workdays."
+   "Optional, for the morning opening by time (e.g. Workday integration, knows public holidays). Without a sensor the weekend days decide."
   ]
  }
 };
 export const CHOICES = {
  "de": {
+  "forecast_type": {
+   "auto": "Automatisch",
+   "daily": "Täglich",
+   "twice_daily": "Zweimal täglich",
+   "hourly": "Stündlich"
+  },
   "language": {
    "auto": "Wie Home Assistant",
    "de": "Deutsch",
@@ -721,9 +759,24 @@ export const CHOICES = {
   "override_trigger": {
    "movement": "Nur wenn das Rollo wirklich fährt",
    "command": "Bei jedem Befehl von Hand, auch ohne Fahrt"
+  },
+  "weekday": {
+   "mon": "Montag",
+   "tue": "Dienstag",
+   "wed": "Mittwoch",
+   "thu": "Donnerstag",
+   "fri": "Freitag",
+   "sat": "Samstag",
+   "sun": "Sonntag"
   }
  },
  "en": {
+  "forecast_type": {
+   "auto": "Automatic",
+   "daily": "Daily",
+   "twice_daily": "Twice daily",
+   "hourly": "Hourly"
+  },
   "language": {
    "auto": "Like Home Assistant",
    "de": "Deutsch",
@@ -742,25 +795,42 @@ export const CHOICES = {
   "override_trigger": {
    "movement": "Only when the cover really moves",
    "command": "With every command by hand, also without movement"
+  },
+  "weekday": {
+   "mon": "Monday",
+   "tue": "Tuesday",
+   "wed": "Wednesday",
+   "thu": "Thursday",
+   "fri": "Friday",
+   "sat": "Saturday",
+   "sun": "Sunday"
   }
  }
 };
 export const ERRORS = {
  "de": {
-  "latest_before_earliest": "Die späteste Zeit darf nicht vor der frühesten liegen.",
-  "night_end_after_evening": "Das Ende der Nacht muss vor dem frühesten Abendbeginn liegen.",
-  "min_above_max": "Das Minimum darf nicht über dem Maximum liegen.",
+  "latest_before_earliest": "Die späteste Zeit liegt vor der frühesten. Bitte die späteste Zeit nach hinten oder die früheste nach vorne verschieben.",
+  "night_end_after_evening": "Das Ende der Nacht muss vor dem frühesten Abendbeginn liegen, z. B. 03:30 bei Abendbeginn ab 17:00.",
+  "min_above_max": "Das Minimum ist größer als das Maximum. Bitte die Werte tauschen oder anpassen.",
   "name_required": "Bitte einen Namen eingeben.",
   "azimuth_equal": "Azimut von und bis müssen verschieden sein.",
-  "no_lux_sensor": "Die Gruppe dieses Fensters hat keinen Helligkeitssensor."
+  "no_lux_sensor": "Die Gruppe dieses Fensters hat keinen Helligkeitssensor. Füge der Gruppe einen Helligkeitssensor hinzu oder wähle einen anderen Modus.",
+  "need_temperature_source": "Bitte einen Außentemperatur-Sensor oder eine Wetter-Entität wählen; ohne Temperatur gibt es keinen Sommertag.",
+  "not_numeric": "Diese Entität meldet keinen Zahlenwert. Bitte einen Sensor mit Messwert wählen (z. B. °C, lx, W, W/m²).",
+  "invalid_notify_service": "Nur Benachrichtigungsdienste (notify.…) sind erlaubt. Bitte einen Dienst aus der Liste wählen.",
+  "cover_in_use": "Dieses Rollo wird schon von einem anderen Fenster gesteuert. Bitte ein anderes Rollo wählen oder das andere Fenster ändern."
  },
  "en": {
-  "latest_before_earliest": "The latest time must not be before the earliest time.",
-  "night_end_after_evening": "The end of the night must be before the earliest evening time.",
-  "min_above_max": "Minimum must not be above maximum.",
+  "latest_before_earliest": "The latest time is before the earliest one. Move the latest time later or the earliest earlier.",
+  "night_end_after_evening": "The end of the night must be before the earliest evening start, e.g. 03:30 with an evening from 17:00.",
+  "min_above_max": "The minimum is above the maximum. Swap or adjust the values.",
   "name_required": "Please enter a name.",
   "azimuth_equal": "Azimuth from and to must differ.",
-  "no_lux_sensor": "The group of this window has no brightness sensor."
+  "no_lux_sensor": "The group of this window has no brightness sensor. Add a brightness sensor to the group or choose another mode.",
+  "need_temperature_source": "Choose an outdoor temperature sensor or a weather entity; without a temperature there is no summer day.",
+  "not_numeric": "This entity does not report a number. Choose a sensor with a measured value (e.g. °C, lx, W, W/m²).",
+  "invalid_notify_service": "Only notification services (notify.…) are allowed. Choose a service from the list.",
+  "cover_in_use": "This cover is already controlled by another window. Choose another cover or change the other window."
  }
 };
 export const STATUS = {

@@ -19,6 +19,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .config_flow import (
+    _advanced_schema,
     _evening_schema,
     _general_schema,
     _group_schema,
@@ -32,6 +33,8 @@ from .config_flow import (
     _validate_evening,
     _validate_group,
     _validate_vacation,
+    cover_in_use,
+    validate_general,
     validate_morning,
     window_basics_fields,
     window_conditions_fields,
@@ -76,6 +79,7 @@ from .const import (
     WINDOW_DEFAULTS,
 )
 from .logic.morning import MODES
+from .units import defaults, interval_unit, temperature_unit, window_defaults
 
 DATA_WS = f"{DOMAIN}_ws_registered"
 
@@ -201,10 +205,11 @@ def _option_fields(hass: HomeAssistant, values: dict[str, Any]) -> dict[Any, Any
     for schema in (
         _general_schema(hass, values),
         _override_schema(values),
-        _summer_schema(values),
+        _summer_schema(values, temperature_unit(hass)),
         _evening_schema(values),
         _vacation_schema(values),
         _startup_schema(values),
+        _advanced_schema(values),
     ):
         fields.update(schema.schema)
     fields.update(HOUSE_FIELDS)
@@ -220,13 +225,13 @@ def _groups(entry: ConfigEntry) -> dict[str, ConfigSubentry]:
 
 
 def _window_fields(
-    entry: ConfigEntry, values: dict[str, Any], group_data: dict[str, Any] | None
+    entry: ConfigEntry, values: dict[str, Any], group_data: dict[str, Any] | None, unit: str
 ) -> dict[Any, Any]:
     """The fields that apply to a window with these values."""
     groups = {sub_id: sub.title for sub_id, sub in _groups(entry).items()}
     fields = {**window_basics_fields(values, groups), **WINDOW_WALL_FIELDS}
     if group_data is not None:
-        fields.update(window_sun_fields(values, group_data))
+        fields.update(window_sun_fields(values, group_data, unit))
     options = dict(entry.options)
     for build in (
         window_override_fields(values),
@@ -241,10 +246,10 @@ def _window_fields(
     return fields
 
 
-def _all_window_fields(entry: ConfigEntry, values: dict[str, Any]) -> dict[Any, Any]:
+def _all_window_fields(entry: ConfigEntry, values: dict[str, Any], unit: str) -> dict[Any, Any]:
     """Every window field, also the ones that do not apply right now."""
     all_sensors = {key: ["sensor.any"] for key in SENSOR_KINDS.values()}
-    fields = _window_fields(entry, {**values, CONF_MORNING: False}, all_sensors)
+    fields = _window_fields(entry, {**values, CONF_MORNING: False}, all_sensors, unit)
     for mode in MODES:
         fields.update(window_morning_mode_fields(mode, values))
     return fields
@@ -252,11 +257,12 @@ def _all_window_fields(entry: ConfigEntry, values: dict[str, Any]) -> dict[Any, 
 
 def _field_info(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Selector of every field (type, range, unit, domains) for the panel."""
+    unit = temperature_unit(hass)
     fields: dict[Any, Any] = {
-        **_option_fields(hass, {**DEFAULTS}),
+        **_option_fields(hass, defaults(unit)),
         **_group_schema({}).schema,
         **WALL_FIELD,
-        **_all_window_fields(entry, {**WINDOW_DEFAULTS}),
+        **_all_window_fields(entry, window_defaults(unit), unit),
     }
     return {
         _key(marker): validator.serialize()["selector"]
@@ -270,6 +276,7 @@ def _field_info(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
 
 def config_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     registry = er.async_get(hass)
+    unit = temperature_unit(hass)
 
     def entity_ids(prefix: str, keys: dict[str, str]) -> dict[str, str]:
         found = {}
@@ -284,7 +291,7 @@ def config_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     return {
         "entry_id": entry.entry_id,
         "loaded": entry.state is ConfigEntryState.LOADED,
-        "options": {**DEFAULTS, **entry.options},
+        "options": {**defaults(unit), **entry.options},
         "groups": [item(sub_id, sub) for sub_id, sub in _groups(entry).items()],
         "windows": [
             {**item(sub_id, sub), "entities": entity_ids(sub_id, WINDOW_ENTITIES)}
@@ -293,8 +300,10 @@ def config_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
         ],
         "entities": entity_ids(entry.entry_id, GLOBAL_ENTITIES),
         "notify_services": _notify_services(hass),
-        "defaults": {"window": WINDOW_DEFAULTS, "group": GROUP_DEFAULTS},
+        "defaults": {"window": window_defaults(unit), "group": GROUP_DEFAULTS},
         "fields": _field_info(hass, entry),
+        "temperature_unit": unit,
+        "interval_unit": interval_unit(unit),
     }
 
 
@@ -327,10 +336,14 @@ def ws_save_options(
     if unknown := sorted(set(msg["options"]) - OPTION_KEYS):
         connection.send_error(msg["id"], "invalid", f"unknown option {', '.join(unknown)}")
         return
-    values = {**DEFAULTS, **entry.options, **msg["options"]}
+    values = {**defaults(temperature_unit(hass)), **entry.options, **msg["options"]}
     checked, errors = _check(_option_fields(hass, values), values)
     if not errors:
-        errors = {**_validate_evening(checked), **_validate_vacation(checked)}
+        errors = {
+            **validate_general(hass, checked),
+            **_validate_evening(checked),
+            **_validate_vacation(checked),
+        }
     if errors:
         connection.send_result(msg["id"], {"errors": errors})
         return
@@ -341,7 +354,11 @@ def ws_save_options(
 
 
 def _save_group(
-    entry: ConfigEntry, current: dict[str, Any], incoming: dict[str, Any]
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    sub_id: str | None,
+    current: dict[str, Any],
+    incoming: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, str]]:
     values = {**GROUP_DEFAULTS, **current, **incoming}
     values[CONF_NAME] = str(values.get(CONF_NAME) or "").strip()
@@ -350,13 +367,18 @@ def _save_group(
         if errors.get(CONF_NAME) == "required":
             errors[CONF_NAME] = "name_required"
         return {}, errors
-    return checked, _validate_group(checked)
+    return checked, _validate_group(checked, hass)
 
 
 def _save_window(
-    entry: ConfigEntry, current: dict[str, Any], incoming: dict[str, Any]
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    sub_id: str | None,
+    current: dict[str, Any],
+    incoming: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    values = {**WINDOW_DEFAULTS, **current, **incoming}
+    unit = temperature_unit(hass)
+    values = {**window_defaults(unit), **current, **incoming}
     for key in (CONF_EVENING_EARLIEST, CONF_EVENING_ELEVATION, CONF_EVENING_LATEST):
         if _empty(values.get(key)):
             values[key] = entry.options.get(key, DEFAULTS[key])
@@ -364,11 +386,13 @@ def _save_window(
     values = {k: v for k, v in values.items() if not _empty(v)}
     group = _groups(entry).get(str(values.get(CONF_GROUP, "")))
     group_data = {**GROUP_DEFAULTS, **group.data} if group else None
-    fields = _window_fields(entry, values, group_data)
+    fields = _window_fields(entry, values, group_data, unit)
     checked, errors = _check(fields, values)
     # fields that do not apply right now keep their value, but it must be valid
     shown = {_key(marker) for marker in fields}
-    hidden = {m: v for m, v in _all_window_fields(entry, values).items() if _key(m) not in shown}
+    hidden = {
+        m: v for m, v in _all_window_fields(entry, values, unit).items() if _key(m) not in shown
+    }
     hidden_checked, hidden_errors = _check(hidden, values, require=False)
     checked.update(hidden_checked)
     errors.update(hidden_errors)
@@ -382,6 +406,8 @@ def _save_window(
     if data.get(CONF_EVENING_CUSTOM):
         errors.update(_validate_evening(data))
     errors.update(validate_morning(data, group_data))
+    if cover_in_use(entry, data.get(CONF_COVER), sub_id) is not None:
+        errors[CONF_COVER] = "cover_in_use"
     return data, errors
 
 
@@ -413,7 +439,7 @@ def ws_save_subentry(
     incoming = {k: v for k, v in msg["data"].items() if k in allowed}
     current = dict(subentry.data) if subentry else {}
     save = _save_group if subentry_type == SUBENTRY_GROUP else _save_window
-    data, errors = save(entry, current, incoming)
+    data, errors = save(hass, entry, sub_id, current, incoming)
     if errors:
         connection.send_result(msg["id"], {"errors": errors})
         return
