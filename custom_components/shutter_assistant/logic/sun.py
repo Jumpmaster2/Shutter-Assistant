@@ -17,11 +17,6 @@ def azimuth(observer: Observer, when: datetime) -> float:
     return float(astral_sun.azimuth(observer, when))
 
 
-def elevation(observer: Observer, when: datetime) -> float:
-    """Elevation of the sun in degrees (with refraction)."""
-    return float(astral_sun.elevation(observer, when))
-
-
 def in_sector(az: float, start: float, end: float) -> bool:
     """Is the azimuth strictly inside the sector?
 

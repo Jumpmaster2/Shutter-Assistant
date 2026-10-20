@@ -24,6 +24,9 @@ def test_workday() -> None:
     assert not morning.is_workday(date(2026, 10, 17), None)
     assert not morning.is_workday(DAY, "off")  # holiday by sensor
     assert morning.is_workday(date(2026, 10, 17), "on")
+    # other weekend days (e.g. Friday and Saturday)
+    assert not morning.is_workday(date(2026, 10, 16), None, ["fri", "sat"])
+    assert morning.is_workday(date(2026, 10, 18), None, ["fri", "sat"])
 
 
 def test_fixed_time() -> None:
