@@ -14,6 +14,7 @@ const UI = {
       summer: ["Sommertag", "Sonnenschutz gibt es nur an Sommertagen."],
       override: ["Manuelle Übersteuerung", "Wann eine Bedienung von Hand (Taster, App, Sprachassistent) die Übersteuerung eines Fensters startet. Dauer und weitere Einstellungen stehen am Fenster."],
       startup: ["Neustart-Schutz", "Nach dem Start von Home Assistant eine Weile keine Fahrten."],
+      advanced: ["Erweitert", "Selten benötigte Einstellungen."],
       evening: ["Abendmodus", "Schließt die Rollos einmal und sperrt Auto-Hoch. Fenster können eigene Zeiten haben."],
       vacation: ["Urlaubssimulation", "Solange Urlaub ist, öffnen die Fenster morgens und schließen abends zu zufälligen Zeiten."],
       w_basics: ["Fenster", "Rollo, Fensterkontakte und Himmelsrichtung."],
@@ -79,7 +80,7 @@ const UI = {
     no: "nein",
     on: "an",
     off: "aus",
-    forecast: (v, t) => `Vorhersage ${v} °C, ab ${t} °C`,
+    forecast: (v, t, u) => `Vorhersage ${v} ${u}, ab ${t} ${u}`,
     noForecast: "keine Vorhersage",
     raised: "durch die Außentemperatur",
     evening: "Abendmodus",
@@ -105,11 +106,11 @@ const UI = {
     check: {
       summer: "Sommertag",
       night: "Nacht (später Sommertag)",
-      nightText: (v, t) => `Tiefstwert ${v} °C, ab ${t} °C`,
+      nightText: (v, t, u) => `Tiefstwert ${v} ${u}, ab ${t} ${u}`,
       noNight: "kein Tiefstwert",
       raisedText: (v) => `durch die Außentemperatur${v ? `, ${v}` : ""}`,
       room: "Raum zu warm",
-      roomText: (v, l) => `${v} °C, ab ${l} °C`,
+      roomText: (v, l, u) => `${v} ${u}, ab ${l} ${u}`,
       roomUnknown: "kein Wert, zählt als warm",
       cooling: "Klimaanlage",
       coolingOn: "kühlt, Raum zählt als warm",
@@ -145,6 +146,7 @@ const UI = {
     missing: (where, id) => `${where}: ${id} gibt es nicht`,
     missingGroup: (w) => `${w}: die Gruppe wurde gelöscht, kein Sonnenschutz`,
     noWeather: "Keine Wetter-Entität: der Sommertag beginnt nur, wenn die Außentemperatur die Schwelle überschreitet.",
+    noTemperature: "Weder Außentemperatur-Sensor noch Wetter-Entität: es gibt keinen Sommertag.",
     global: "Allgemein",
     columns: { name: "Name", group: "Gruppe", status: "Status", position: "Position" },
     usedBy: "Verwendet von",
@@ -164,6 +166,7 @@ const UI = {
       summer: ["Summer day", "Sun protection only runs on summer days."],
       override: ["Manual override", "When a movement by hand (switch, app, voice assistant) starts the override of a window. Duration and further settings are set per window."],
       startup: ["Restart protection", "No movement for a while after Home Assistant started."],
+      advanced: ["Advanced", "Settings that are rarely needed."],
       evening: ["Evening mode", "Closes the covers once and blocks auto up. Windows can use own times."],
       vacation: ["Vacation simulation", "While vacation is active, the windows open in the morning and close in the evening at random times."],
       w_basics: ["Window", "Cover, window contacts and sun direction."],
@@ -229,7 +232,7 @@ const UI = {
     no: "no",
     on: "on",
     off: "off",
-    forecast: (v, t) => `forecast ${v} °C, from ${t} °C`,
+    forecast: (v, t, u) => `forecast ${v} ${u}, from ${t} ${u}`,
     noForecast: "no forecast",
     raised: "by the outdoor temperature",
     evening: "Evening mode",
@@ -255,11 +258,11 @@ const UI = {
     check: {
       summer: "Summer day",
       night: "Night (late summer day)",
-      nightText: (v, t) => `low ${v} °C, from ${t} °C`,
+      nightText: (v, t, u) => `low ${v} ${u}, from ${t} ${u}`,
       noNight: "no forecast low",
       raisedText: (v) => `by the outdoor temperature${v ? `, ${v}` : ""}`,
       room: "Room too warm",
-      roomText: (v, l) => `${v} °C, from ${l} °C`,
+      roomText: (v, l, u) => `${v} ${u}, from ${l} ${u}`,
       roomUnknown: "no value, counts as warm",
       cooling: "Air conditioner",
       coolingOn: "cooling, room counts as warm",
@@ -295,6 +298,7 @@ const UI = {
     missing: (where, id) => `${where}: ${id} does not exist`,
     missingGroup: (w) => `${w}: the group was deleted, no sun protection`,
     noWeather: "No weather entity: the summer day only starts when the outdoor temperature exceeds the threshold.",
+    noTemperature: "Neither outdoor temperature sensor nor weather entity: there is no summer day.",
     global: "General",
     columns: { name: "Name", group: "Group", status: "Status", position: "Position" },
     usedBy: "Used by",
@@ -319,10 +323,11 @@ const TABS = [
 // Global settings: cards per tab
 const SETTINGS = {
   general: [
-    { id: "sensors", icon: "mdi:thermometer", fields: ["outdoor_temperature", "weather", "language", "notify_services", "workday_entity"] },
+    { id: "sensors", icon: "mdi:thermometer", fields: ["outdoor_temperature", "weather", "language", "notify_services", "workday_entity", "weekend_days"] },
     { id: "override", icon: "mdi:hand-back-right-outline", fields: ["override_trigger"] },
-    { id: "summer", icon: "mdi:white-balance-sunny", fields: ["summer_threshold", "night_threshold", "heating_entity", "day_change_time"] },
+    { id: "summer", icon: "mdi:white-balance-sunny", fields: ["summer_threshold", "night_threshold", "heating_entity", "day_change_time", "forecast_type"] },
     { id: "startup", icon: "mdi:restart", fields: ["startup_delay", "catch_up_after"] },
+    { id: "advanced", icon: "mdi:cog-outline", fields: ["window_closed_delay", "show_panel"] },
     { id: "house", icon: "mdi:home-outline", fields: ["house_azimuth", "house_width", "house_depth"], preview: true },
   ],
   evening: [
@@ -523,6 +528,10 @@ class ShutterAssistantPanel extends HTMLElement {
     const number = Number(value);
     if (value === null || value === undefined || value === "" || Number.isNaN(number)) return "";
     return number.toLocaleString(this.locale, { maximumFractionDigits: digits });
+  }
+
+  get _unit() {
+    return this._cfg?.temperature_unit || "°C";
   }
 
   _dir(az) {
@@ -877,7 +886,7 @@ class ShutterAssistantPanel extends HTMLElement {
     let summerText = summer ? (summer.state === "on" ? ui.yes : ui.no) : ui.unavailable;
     if (summer) {
       if (sa.raised_by_outdoor_temperature && summer.state === "on") summerText += ` (${ui.raised})`;
-      else summerText += ` (${sa.forecast_max !== null && sa.forecast_max !== undefined ? ui.forecast(this._num(sa.forecast_max), threshold) : ui.noForecast})`;
+      else summerText += ` (${sa.forecast_max !== null && sa.forecast_max !== undefined ? ui.forecast(this._num(sa.forecast_max), threshold, this._unit) : ui.noForecast})`;
     }
     const evening = this._state(ent.evening_mode);
     const ea = evening?.attributes || {};
@@ -928,7 +937,8 @@ class ShutterAssistantPanel extends HTMLElement {
       check(win.title, [d.cover, ...(d.window_sensors || []), d.room_entity, d.cooling_entity, d.open_block_entity, d.window_exception_entity, ...(d.close_trigger_entities || []), d.morning_enabled && d.morning_mode === "trigger" ? d.morning_trigger_entity : null]);
       if (d.group && !this._group(d.group)) hints.push(["mdi:alert-outline", ui.missingGroup(win.title)]);
     }
-    if (!o.weather) hints.push(["mdi:information-outline", ui.noWeather]);
+    if (!o.weather && !o.outdoor_temperature) hints.push(["mdi:alert-outline", ui.noTemperature]);
+    else if (!o.weather) hints.push(["mdi:information-outline", ui.noWeather]);
     return `<div class="card">
       <h2><ha-icon icon="mdi:information-outline"></ha-icon>${esc(ui.hints)}</h2>
       ${hints.length
@@ -989,19 +999,19 @@ class ShutterAssistantPanel extends HTMLElement {
     const rows = [];
     const row = (state, label, detail) => rows.push([state, label, detail]);
     const has = (v) => v !== null && v !== undefined;
-    const forecastText = has(a.forecast_max) ? ui.forecast(this._num(a.forecast_max), this._num(a.summer_threshold)) : ui.noForecast;
+    const unit = a.temperature_unit || this._unit;
+    const forecastText = has(a.forecast_max) ? ui.forecast(this._num(a.forecast_max), this._num(a.summer_threshold), unit) : ui.noForecast;
     const byForecast = has(a.forecast_max) && Number(a.forecast_max) >= Number(a.summer_threshold);
     row(a.summer_day ? "ok" : "fail", c.summer, a.raised_by_outdoor_temperature && !byForecast ? c.raisedText(forecastText) : forecastText);
     if (a.raised_by_outdoor_temperature && !byForecast && has(a.night_threshold)) {
       const nightOk = !has(a.night_low) || Number(a.night_low) >= Number(a.night_threshold);
-      row(nightOk ? "ok" : "fail", c.night, has(a.night_low) ? c.nightText(this._num(a.night_low), this._num(a.night_threshold)) : c.noNight);
+      row(nightOk ? "ok" : "fail", c.night, has(a.night_low) ? c.nightText(this._num(a.night_low), this._num(a.night_threshold), unit) : c.noNight);
     }
-    const outdoor = this._state(a.temperature_sensor);
-    const temp = outdoor && !INVALID.includes(outdoor.state) ? `${this._num(outdoor.state)} °C` : c.noValue;
+    const temp = has(a.outdoor_temperature) ? `${this._num(a.outdoor_temperature)} ${unit}` : c.noValue;
     row(
       a.temperature_ok ? "ok" : a.temperature_ok_at ? "wait" : "fail",
       c.temperature,
-      `${temp}, ${c.from} ${this._num(a.temperature_threshold)} °C${a.temperature_ok_at ? ` · ${c.pendingAt(this._time(a.temperature_ok_at))}` : ""}`,
+      `${temp}, ${c.from} ${this._num(a.temperature_threshold)} ${unit}${a.temperature_ok_at ? ` · ${c.pendingAt(this._time(a.temperature_ok_at))}` : ""}`,
     );
     for (const [kind] of KINDS) {
       const info = a.sensors?.[kind];
@@ -1018,7 +1028,7 @@ class ShutterAssistantPanel extends HTMLElement {
       row(
         a.room_warm === false ? "fail" : "ok",
         `${c.room}: ${this._name(a.room_entity)}`,
-        has(a.room_temperature) ? c.roomText(this._num(a.room_temperature), this._num(a.room_limit)) : c.roomUnknown,
+        has(a.room_temperature) ? c.roomText(this._num(a.room_temperature), this._num(a.room_limit), unit) : c.roomUnknown,
       );
     }
     if (a.cooling_entity) row(a.cooling ? "ok" : "muted", `${c.cooling}: ${this._name(a.cooling_entity)}`, a.cooling ? c.coolingOn : c.coolingOff);
@@ -1374,6 +1384,12 @@ class ShutterAssistantPanel extends HTMLElement {
       }
       case "select": {
         const choices = this._choices(conf);
+        if (conf.multiple && !conf.custom_value) {
+          const chosen = Array.isArray(value) ? value : [];
+          return `<div class="${cls}"><span class="lbl">${esc(name)}</span><div class="seg">
+            ${choices.map(([k, v]) => `<button class="seg-btn ${chosen.includes(k) ? "on" : ""}" data-toggle="${esc(k)}" ${attrs}>${esc(v)}</button>`).join("")}
+            </div>${errHtml}${helpHtml}</div>`;
+        }
         if (conf.multiple) {
           const listId = key === "notify_services" ? "dl-services" : `dl-opt-${key}`;
           return this._chips(cls, name, attrs, key === "notify_services" ? "services" : "values", Array.isArray(value) ? value : [], listId, errHtml + helpHtml);
@@ -1620,6 +1636,15 @@ class ShutterAssistantPanel extends HTMLElement {
       ev.preventDefault();
       const list = this._currentList(d.scope, d.k);
       list.splice(Number(d.remove), 1);
+      this._setValue(d.scope, d.k, list, true);
+      return;
+    }
+    if (d.toggle !== undefined) {
+      ev.preventDefault();
+      const list = this._currentList(d.scope, d.k);
+      const index = list.indexOf(d.toggle);
+      if (index >= 0) list.splice(index, 1);
+      else list.push(d.toggle);
       this._setValue(d.scope, d.k, list, true);
       return;
     }

@@ -47,6 +47,7 @@ from .const import (
     CONF_EVENING_LATEST,
     CONF_FOLLOW_UP_CLOSE,
     CONF_FOLLOW_UP_EARLIEST,
+    CONF_FORECAST_TYPE,
     CONF_GROUP,
     CONF_HEATING_ENTITY,
     CONF_LANGUAGE,
@@ -87,6 +88,7 @@ from .const import (
     CONF_ROOM_ENTITY,
     CONF_ROOM_MARGIN,
     CONF_ROOM_THRESHOLD,
+    CONF_SHOW_PANEL,
     CONF_STARTUP_DELAY,
     CONF_SUMMER_THRESHOLD,
     CONF_SUN_HOLD,
@@ -113,11 +115,14 @@ from .const import (
     CONF_VENT_POSITION,
     CONF_VENTILATION,
     CONF_WEATHER,
+    CONF_WEEKEND_DAYS,
+    CONF_WINDOW_DEBOUNCE,
     CONF_WINDOW_EXCEPTION,
     CONF_WINDOW_SENSORS,
     CONF_WORKDAY,
     DEFAULTS,
     DOMAIN,
+    FORECAST_TYPES,
     FREE_STATES_DEFAULT,
     GROUP_DEFAULTS,
     KIND_LUX,
@@ -134,6 +139,7 @@ from .const import (
     SUBENTRY_GROUP,
     SUBENTRY_WINDOW,
     THRESHOLD_KEYS,
+    WEEKDAYS,
     WINDOW_DEFAULTS,
 )
 from .logic.morning import (
@@ -144,6 +150,13 @@ from .logic.morning import (
     MODES,
     SUN_ELEVATION,
     SUN_SUNRISE,
+)
+from .units import (
+    defaults,
+    interval_unit,
+    temperature_range,
+    temperature_unit,
+    window_defaults,
 )
 
 STATE_SUGGESTIONS = ["off", "on", "unavailable", "unknown", "standby", "idle", "paused", "playing"]
@@ -180,10 +193,18 @@ def _states() -> SelectSelector:
     )
 
 
-def _choice(options: list[str], key: str) -> SelectSelector:
+def _choice(options: list[str], key: str, multiple: bool = False) -> SelectSelector:
     return SelectSelector(
-        SelectSelectorConfig(options=options, translation_key=key, mode=SelectSelectorMode.LIST)
+        SelectSelectorConfig(
+            options=options, translation_key=key, mode=SelectSelectorMode.LIST, multiple=multiple
+        )
     )
+
+
+def _temperature(unit: str, low: float, high: float) -> NumberSelector:
+    """Temperature field; the range is given in °C and converted to ``unit``."""
+    minimum, maximum = temperature_range(unit, low, high)
+    return _number(minimum, maximum, 0.5, unit)
 
 
 def _opt(key: str, values: dict[str, Any]) -> vol.Optional:
@@ -205,6 +226,38 @@ def _notify_services(hass: HomeAssistant) -> list[str]:
     return sorted(f"notify.{name}" for name in hass.services.async_services_for_domain("notify"))
 
 
+def _single_entity(hass: HomeAssistant, domain: str) -> str | None:
+    """The entity of a domain if there is exactly one (suggestion for the setup)."""
+    ids = hass.states.async_entity_ids(domain)
+    return ids[0] if len(ids) == 1 else None
+
+
+def _not_numeric(hass: HomeAssistant, entity_id: str | None) -> bool:
+    """The entity reports a value that is not a number (unavailable is fine)."""
+    state = hass.states.get(entity_id) if entity_id else None
+    if state is None or state.state in ("unavailable", "unknown"):
+        return False
+    try:
+        float(state.state)
+    except ValueError:
+        return True
+    return False
+
+
+def validate_general(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, str]:
+    """Temperature source, a numeric outdoor sensor and only notification services."""
+    errors: dict[str, str] = {}
+    outdoor = data.get(CONF_OUTDOOR_TEMP)
+    if not outdoor and not data.get(CONF_WEATHER):
+        errors[CONF_OUTDOOR_TEMP] = "need_temperature_source"
+    elif _not_numeric(hass, outdoor):
+        errors[CONF_OUTDOOR_TEMP] = "not_numeric"
+    services = data.get(CONF_NOTIFY) or []
+    if any(not str(s).startswith("notify.") or str(s) == "notify." for s in services):
+        errors[CONF_NOTIFY] = "invalid_notify_service"
+    return errors
+
+
 def _time_key(value: Any) -> str:
     text = str(value or "")
     return text if text.count(":") == 2 else f"{text}:00"
@@ -216,7 +269,7 @@ def _time_key(value: Any) -> str:
 def _general_schema(hass: HomeAssistant, v: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
-            vol.Required(CONF_OUTDOOR_TEMP, default=v.get(CONF_OUTDOOR_TEMP)): _entity(["sensor"]),
+            _opt(CONF_OUTDOOR_TEMP, v): _entity(["sensor"]),
             _opt(CONF_WEATHER, v): _entity(["weather"]),
             _req(CONF_LANGUAGE, v): _choice(LANGUAGE_OPTIONS, "language"),
             vol.Optional(CONF_NOTIFY, default=v.get(CONF_NOTIFY, [])): SelectSelector(
@@ -228,17 +281,31 @@ def _general_schema(hass: HomeAssistant, v: dict[str, Any]) -> vol.Schema:
                 )
             ),
             _opt(CONF_WORKDAY, v): _entity(["binary_sensor"]),
+            vol.Optional(
+                CONF_WEEKEND_DAYS, default=v.get(CONF_WEEKEND_DAYS, DEFAULTS[CONF_WEEKEND_DAYS])
+            ): _choice(WEEKDAYS, "weekday", multiple=True),
         }
     )
 
 
-def _summer_schema(v: dict[str, Any]) -> vol.Schema:
+def _summer_schema(v: dict[str, Any], unit: str) -> vol.Schema:
+    temps = defaults(unit)
     return vol.Schema(
         {
-            _req(CONF_SUMMER_THRESHOLD, v): _number(0, 45, 0.5, "°C"),
-            _req(CONF_NIGHT_THRESHOLD, v): _number(-10, 30, 0.5, "°C"),
+            _req(CONF_SUMMER_THRESHOLD, v, temps): _temperature(unit, 0, 45),
+            _req(CONF_NIGHT_THRESHOLD, v, temps): _temperature(unit, -10, 30),
             _opt(CONF_HEATING_ENTITY, v): _entity(["binary_sensor", "input_boolean", "switch"]),
             _req(CONF_DAY_CHANGE, v): TimeSelector(),
+            _req(CONF_FORECAST_TYPE, v): _choice(FORECAST_TYPES, "forecast_type"),
+        }
+    )
+
+
+def _advanced_schema(v: dict[str, Any]) -> vol.Schema:
+    return vol.Schema(
+        {
+            _req(CONF_WINDOW_DEBOUNCE, v): _number(0, 120, 1, "s"),
+            _req(CONF_SHOW_PANEL, v): BooleanSelector(),
         }
     )
 
@@ -332,19 +399,33 @@ class ShutterConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> dict[str, type[ConfigSubentryFlow]]:
         return {SUBENTRY_GROUP: GroupSubentryFlow, SUBENTRY_WINDOW: WindowSubentryFlow}
 
+    @property
+    def _unit(self) -> str:
+        return temperature_unit(self.hass)
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            self._options.update(_clean(user_input))
-            return await self.async_step_summer()
+            errors = validate_general(self.hass, user_input)
+            if not errors:
+                self._options.update(_clean(user_input))
+                return await self.async_step_summer()
+        # suggest the only weather and workday entity
+        values = user_input or {
+            **DEFAULTS,
+            CONF_WEATHER: _single_entity(self.hass, "weather"),
+        }
         return self.async_show_form(
-            step_id="user", data_schema=_general_schema(self.hass, {**DEFAULTS})
+            step_id="user", data_schema=_general_schema(self.hass, values), errors=errors
         )
 
     async def async_step_summer(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
-            self._options.update(user_input)
+            self._options.update(_clean(user_input))
             return await self.async_step_evening()
-        return self.async_show_form(step_id="summer", data_schema=_summer_schema({}))
+        return self.async_show_form(
+            step_id="summer", data_schema=_summer_schema(defaults(self._unit), self._unit)
+        )
 
     async def async_step_evening(
         self, user_input: dict[str, Any] | None = None
@@ -353,7 +434,7 @@ class ShutterConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             errors = _validate_evening(user_input)
             if not errors:
-                options = {**DEFAULTS, **self._options, **user_input}
+                options = {**defaults(self._unit), **self._options, **user_input}
                 return self.async_create_entry(title=NAME, data={}, options=options)
         return self.async_show_form(
             step_id="evening", data_schema=_evening_schema(user_input or {}), errors=errors
@@ -367,8 +448,12 @@ class ShutterOptionsFlow(OptionsFlow):
     """All global settings, grouped in a menu."""
 
     @property
+    def _unit(self) -> str:
+        return temperature_unit(self.hass)
+
+    @property
     def _values(self) -> dict[str, Any]:
-        return {**DEFAULTS, **self.config_entry.options}
+        return {**defaults(self._unit), **self.config_entry.options}
 
     def _save(self, updates: dict[str, Any], remove: tuple[str, ...] = ()) -> ConfigFlowResult:
         options = {**self.config_entry.options}
@@ -380,22 +465,39 @@ class ShutterOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
             step_id="init",
-            menu_options=["general", "override", "summer", "evening", "vacation", "startup"],
+            menu_options=[
+                "general",
+                "override",
+                "summer",
+                "evening",
+                "vacation",
+                "startup",
+                "advanced",
+            ],
         )
 
     async def async_step_general(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self._save(_clean(user_input), remove=(CONF_WEATHER, CONF_WORKDAY))
+            errors = validate_general(self.hass, user_input)
+            if not errors:
+                return self._save(
+                    _clean(user_input), remove=(CONF_OUTDOOR_TEMP, CONF_WEATHER, CONF_WORKDAY)
+                )
         return self.async_show_form(
-            step_id="general", data_schema=_general_schema(self.hass, self._values)
+            step_id="general",
+            data_schema=_general_schema(self.hass, user_input or self._values),
+            errors=errors,
         )
 
     async def async_step_summer(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
-            return self._save(user_input)
-        return self.async_show_form(step_id="summer", data_schema=_summer_schema(self._values))
+            return self._save(_clean(user_input), remove=(CONF_HEATING_ENTITY,))
+        return self.async_show_form(
+            step_id="summer", data_schema=_summer_schema(self._values, self._unit)
+        )
 
     async def async_step_evening(
         self, user_input: dict[str, Any] | None = None
@@ -439,6 +541,13 @@ class ShutterOptionsFlow(OptionsFlow):
             return self._save(user_input)
         return self.async_show_form(step_id="startup", data_schema=_startup_schema(self._values))
 
+    async def async_step_advanced(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self._save(user_input)
+        return self.async_show_form(step_id="advanced", data_schema=_advanced_schema(self._values))
+
 
 # ---------------------------------------------------------------- group subentry
 
@@ -458,12 +567,16 @@ def _group_schema(v: dict[str, Any]) -> vol.Schema:
     return vol.Schema(fields)
 
 
-def _validate_group(data: dict[str, Any]) -> dict[str, str]:
+def _validate_group(data: dict[str, Any], hass: HomeAssistant | None = None) -> dict[str, str]:
     errors: dict[str, str] = {}
     if not str(data.get(CONF_NAME, "")).strip():
         errors[CONF_NAME] = "name_required"
     if float(data.get(CONF_AZIMUTH_FROM, 0)) == float(data.get(CONF_AZIMUTH_TO, 0)):
         errors[CONF_AZIMUTH_TO] = "azimuth_equal"
+    if hass is not None:
+        for key in SENSOR_KINDS.values():
+            if any(_not_numeric(hass, e) for e in data.get(key) or []):
+                errors[key] = "not_numeric"
     return errors
 
 
@@ -473,7 +586,7 @@ class GroupSubentryFlow(ConfigSubentryFlow):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = _validate_group(user_input)
+            errors = _validate_group(user_input, self.hass)
             if not errors:
                 data = {**user_input, CONF_NAME: str(user_input[CONF_NAME]).strip()}
                 return self.async_create_entry(title=data[CONF_NAME], data=data)
@@ -488,7 +601,7 @@ class GroupSubentryFlow(ConfigSubentryFlow):
         errors: dict[str, str] = {}
         values = {CONF_NAME: subentry.title, **subentry.data}
         if user_input is not None:
-            errors = _validate_group(user_input)
+            errors = _validate_group(user_input, self.hass)
             if not errors:
                 # keep values only the panel sets (wall of the house)
                 data = {
@@ -513,8 +626,22 @@ SENSOR_UNITS: dict[str, str] = {KIND_PV: "W", KIND_LUX: "lx", KIND_RADIATION: "W
 SENSOR_MAXIMA: dict[str, int] = {KIND_PV: 100000, KIND_LUX: 200000, KIND_RADIATION: 1500}
 
 
-def _wreq(key: str, values: dict[str, Any]) -> vol.Required:
-    return vol.Required(key, default=values.get(key, WINDOW_DEFAULTS.get(key)))
+def _wreq(key: str, values: dict[str, Any], base: dict[str, Any] | None = None) -> vol.Required:
+    base = base if base is not None else WINDOW_DEFAULTS
+    return vol.Required(key, default=values.get(key, base.get(key)))
+
+
+def cover_in_use(entry: ConfigEntry, cover: Any, own_id: str | None) -> str | None:
+    """Title of another window that already controls ``cover``."""
+    for sub_id, sub in entry.subentries.items():
+        if (
+            sub.subentry_type == SUBENTRY_WINDOW
+            and sub_id != own_id
+            and cover
+            and sub.data.get(CONF_COVER) == cover
+        ):
+            return sub.title
+    return None
 
 
 def window_basics_fields(values: dict[str, Any], groups: dict[str, str]) -> dict[Any, Any]:
@@ -534,8 +661,11 @@ def window_basics_fields(values: dict[str, Any], groups: dict[str, str]) -> dict
     return fields
 
 
-def window_sun_fields(values: dict[str, Any], group_data: dict[str, Any]) -> dict[Any, Any]:
+def window_sun_fields(
+    values: dict[str, Any], group_data: dict[str, Any], unit: str
+) -> dict[Any, Any]:
     """Thresholds for the sensor types of the group, hold times, position, auto up."""
+    temps = window_defaults(unit)
     fields: dict[Any, Any] = {}
     for kind, sensors_key in SENSOR_KINDS.items():
         if group_data.get(sensors_key):
@@ -544,11 +674,13 @@ def window_sun_fields(values: dict[str, Any], group_data: dict[str, Any]) -> dic
             )
     fields.update(
         {
-            _wreq(CONF_TEMP_THRESHOLD, values): _number(-20, 45, 0.5, "°C"),
+            _wreq(CONF_TEMP_THRESHOLD, values, temps): _temperature(unit, -20, 45),
             _wreq(CONF_TEMP_HOLD, values): _number(0, 120, 1, "min"),
             _opt(CONF_ROOM_ENTITY, values): _entity(["climate", "sensor"]),
-            _wreq(CONF_ROOM_MARGIN, values): _number(0, 10, 0.5, "K"),
-            _wreq(CONF_ROOM_THRESHOLD, values): _number(10, 40, 0.5, "°C"),
+            _wreq(CONF_ROOM_MARGIN, values, temps): _number(
+                0, 10 if unit == "°C" else 18, 0.5, interval_unit(unit)
+            ),
+            _wreq(CONF_ROOM_THRESHOLD, values, temps): _temperature(unit, 10, 40),
             _opt(CONF_COOLING_ENTITY, values): _entity(["climate"]),
             _wreq(CONF_SUN_HOLD, values): _number(0, 120, 1, "min"),
             _wreq(CONF_SUN_POSITION, values): _number(0, 100, 1, "%"),
@@ -691,8 +823,12 @@ class WindowSubentryFlow(ConfigSubentryFlow):
             if sub.subentry_type == SUBENTRY_GROUP
         }
 
+    @property
+    def _unit(self) -> str:
+        return temperature_unit(self.hass)
+
     def _finish(self) -> SubentryFlowResult:
-        data = _clean({**WINDOW_DEFAULTS, **self._values})
+        data = _clean({**window_defaults(self._unit), **self._values})
         title = str(data.get(CONF_NAME, "")).strip()
         if self._reconfigure:
             return self.async_update_and_abort(
@@ -726,11 +862,14 @@ class WindowSubentryFlow(ConfigSubentryFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             name = str(user_input.get(CONF_NAME, "")).strip()
+            own_id = self._get_reconfigure_subentry().subentry_id if self._reconfigure else None
+            other = cover_in_use(self._get_entry(), user_input.get(CONF_COVER), own_id)
             if not name:
                 errors[CONF_NAME] = "name_required"
+            elif other is not None:
+                errors[CONF_COVER] = "cover_in_use"
             else:
-                for key in (CONF_GROUP,):
-                    self._values.pop(key, None)
+                self._values.pop(CONF_GROUP, None)
                 self._values.update({**user_input, CONF_NAME: name})
                 has_group = self._values.get(CONF_GROUP) in self._groups()
                 if not has_group:
@@ -743,13 +882,18 @@ class WindowSubentryFlow(ConfigSubentryFlow):
         groups = {sub_id: sub.title for sub_id, sub in self._groups().items()}
         return self.async_show_form(
             step_id="basics",
-            data_schema=vol.Schema(window_basics_fields(self._values, groups)),
+            data_schema=vol.Schema(
+                window_basics_fields({**self._values, **(user_input or {})}, groups)
+            ),
             errors=errors,
             last_step=self._reconfigure,
         )
 
     async def async_step_sun(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         if user_input is not None:
+            # cleared optional entities are missing in the input
+            for key in (CONF_ROOM_ENTITY, CONF_COOLING_ENTITY):
+                self._values.pop(key, None)
             self._values.update(user_input)
             if self._reconfigure:
                 return self._finish()
@@ -758,7 +902,7 @@ class WindowSubentryFlow(ConfigSubentryFlow):
         group_data = {**GROUP_DEFAULTS, **(group.data if group else {})}
         return self.async_show_form(
             step_id="sun",
-            data_schema=vol.Schema(window_sun_fields(self._values, group_data)),
+            data_schema=vol.Schema(window_sun_fields(self._values, group_data, self._unit)),
             description_placeholders={"group": group.title if group else ""},
             last_step=self._reconfigure,
         )

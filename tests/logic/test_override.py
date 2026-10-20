@@ -13,7 +13,6 @@ def test_tracker_explains_reports_until_target_and_grace() -> None:
     assert tracker.explains("cover.a", None, "open", 10, 20)  # reached target
     assert tracker.explains("cover.a", None, "open", 11, 30)  # late report within grace
     assert not tracker.explains("cover.a", None, "open", 50, 40)  # after grace: not ours
-    assert not tracker.pending("cover.a")
 
 
 def test_tracker_times_out() -> None:
@@ -114,3 +113,5 @@ def test_override_until() -> None:
     sunrise = datetime(2026, 10, 16, 6, 0, tzinfo=UTC)
     assert override_until(now, 60, sunrise) == now + timedelta(minutes=60)
     assert override_until(now, 0, sunrise) == sunrise
+    # polar day or night: no sunrise
+    assert override_until(now, 0, None) == now + timedelta(hours=24)

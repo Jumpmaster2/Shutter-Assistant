@@ -132,9 +132,8 @@ def sun(rules: WindowRules, s: Situation) -> list[Action]:
     cover still stands at the sun protection position (up to the tolerance), no
     override, not in the evening and no opening block.
     """
-    if not s.active:
+    if not s.active or s.position is None:
         return []
-    assert s.position is not None
     if s.live and s.in_sector and not s.override and not s.sun_marker:
         if s.position <= rules.sun_position:
             return [Action(MARK_SUN, R_SUN_ALREADY)]
@@ -254,9 +253,8 @@ def vacation_open(rules: WindowRules, s: Situation, position: int) -> list[Actio
     """Vacation morning: open covers that were closed for the night."""
     if not s.active or not _vacation_applies(rules, s) or _override_blocks_evening(rules, s):
         return []
-    if s.open_blocked:
+    if s.open_blocked or s.position is None:
         return []
-    assert s.position is not None
     if not (s.evening_marker or s.position <= rules.closed_position):
         return []
     return [_move(position, R_VACATION_OPEN), Action(CLEAR_EVENING, R_VACATION_OPEN)]
@@ -265,9 +263,13 @@ def vacation_open(rules: WindowRules, s: Situation, position: int) -> list[Actio
 def vacation_close(rules: WindowRules, s: Situation) -> list[Action]:
     """Vacation evening: mark as closed for the night and close if the window is
     closed. Only the window sensor counts here (no exception entity)."""
-    if not s.active or not _vacation_applies(rules, s) or _override_blocks_evening(rules, s):
+    if (
+        not s.active
+        or s.position is None
+        or not _vacation_applies(rules, s)
+        or _override_blocks_evening(rules, s)
+    ):
         return []
-    assert s.position is not None
     actions = [Action(MARK_EVENING, R_VACATION_CLOSE)]
     if s.position > CLOSED and not s.window_open:
         actions.insert(0, _move(CLOSED, R_VACATION_CLOSE))
@@ -280,9 +282,8 @@ def morning(rules: WindowRules, s: Situation, manual_since_evening: bool) -> lis
     Directly to the sun protection position if the sun condition applies."""
     if not rules.morning or not s.active or _vacation_applies(rules, s):
         return []
-    if s.override or s.open_blocked or manual_since_evening:
+    if s.override or s.open_blocked or manual_since_evening or s.position is None:
         return []
-    assert s.position is not None
     target, reason = rules.morning_position, R_MORNING
     sun_now = rules.morning_sun_position and s.live and s.in_sector
     if sun_now:

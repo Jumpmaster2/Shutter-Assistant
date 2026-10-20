@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, tzinfo
 
@@ -28,11 +29,16 @@ class MorningSettings:
     trigger_offset: float = 0.0
 
 
-def is_workday(day: date, workday_state: str | None) -> bool:
-    """Workday sensor wins; without it Monday to Friday are workdays."""
+WEEKDAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
+def is_workday(
+    day: date, workday_state: str | None, weekend: Iterable[str] = ("sat", "sun")
+) -> bool:
+    """Workday sensor wins; without it every day outside ``weekend`` is a workday."""
     if workday_state in ("on", "off"):
         return workday_state == "on"
-    return day.weekday() < 5
+    return WEEKDAY_KEYS[day.weekday()] not in set(weekend)
 
 
 def bounds(day: date, tz: tzinfo, settings: MorningSettings) -> tuple[datetime, datetime]:

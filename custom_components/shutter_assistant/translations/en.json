@@ -9,14 +9,16 @@
           "weather": "Weather entity",
           "language": "Language of messages",
           "notify_services": "Notification services",
-          "workday_entity": "Workday sensor"
+          "workday_entity": "Workday sensor",
+          "weekend_days": "Weekend days"
         },
         "data_description": {
-          "outdoor_temperature": "Used for the summer day and the temperature condition of every window.",
+          "outdoor_temperature": "For the summer day and the temperature condition of every window. Without a sensor the current temperature of the weather entity is used (at least one of both).",
           "weather": "Its daily forecast decides at the day change whether today is a summer day.",
           "language": "Logbook, last reason and push messages.",
-          "notify_services": "Get a message when an open window prevents the sun protection (e.g. notify.mobile_app_phone).",
-          "workday_entity": "Optional, for the morning opening by time (e.g. the Workday integration). Without it Monday to Friday are workdays."
+          "notify_services": "Get a message when an open window prevents sun protection (notify services only, e.g. notify.mobile_app_phone).",
+          "workday_entity": "Optional, for the morning opening by time (e.g. Workday integration, knows public holidays). Without a sensor the weekend days decide.",
+          "weekend_days": "Only without a workday sensor: on these days the weekend time of the morning opening applies."
         }
       },
       "summer": {
@@ -26,13 +28,15 @@
           "summer_threshold": "Summer day from forecast high",
           "night_threshold": "Late summer day only with a night from",
           "heating_entity": "Heating wanted",
-          "day_change_time": "Day change"
+          "day_change_time": "Day change",
+          "forecast_type": "Kind of forecast"
         },
         "data_description": {
           "summer_threshold": "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value (see night).",
           "night_threshold": "A summer day only by the outdoor temperature counts only when the forecast low of the coming night is at least this value. When the night cools down (spring, autumn), the warmth stays in the house. Without a low in the forecast the summer day counts as before.",
-          "heating_entity": "Optional, e.g. the heating day of AI Heating Assistant. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are not lowered then.",
-          "day_change_time": "Forecast check and reset of the daily sun protection markers and notifications."
+          "heating_entity": "Optional, e.g. an input_boolean \"heating season\" or the heating day of a heating control. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are then not lowered.",
+          "day_change_time": "Forecast check and reset of the daily sun protection markers and notifications.",
+          "forecast_type": "Automatic takes the first kind the weather entity supports (daily, twice daily, hourly). From hourly values the high of the day and the low of the night are calculated."
         }
       },
       "evening": {
@@ -55,12 +59,16 @@
       }
     },
     "error": {
-      "latest_before_earliest": "The latest time must not be before the earliest time.",
-      "night_end_after_evening": "The end of the night must be before the earliest evening time.",
-      "min_above_max": "Minimum must not be above maximum.",
+      "latest_before_earliest": "The latest time is before the earliest one. Move the latest time later or the earliest earlier.",
+      "night_end_after_evening": "The end of the night must be before the earliest evening start, e.g. 03:30 with an evening from 17:00.",
+      "min_above_max": "The minimum is above the maximum. Swap or adjust the values.",
       "name_required": "Please enter a name.",
       "azimuth_equal": "Azimuth from and to must differ.",
-      "no_lux_sensor": "The group of this window has no brightness sensor."
+      "no_lux_sensor": "The group of this window has no brightness sensor. Add a brightness sensor to the group or choose another mode.",
+      "need_temperature_source": "Choose an outdoor temperature sensor or a weather entity; without a temperature there is no summer day.",
+      "not_numeric": "This entity does not report a number. Choose a sensor with a measured value (e.g. °C, lx, W, W/m²).",
+      "invalid_notify_service": "Only notification services (notify.…) are allowed. Choose a service from the list.",
+      "cover_in_use": "This cover is already controlled by another window. Choose another cover or change the other window."
     }
   },
   "options": {
@@ -73,7 +81,8 @@
           "summer": "Summer day",
           "evening": "Evening mode",
           "vacation": "Vacation simulation",
-          "startup": "Restart protection"
+          "startup": "Restart protection",
+          "advanced": "Advanced"
         }
       },
       "general": {
@@ -83,14 +92,16 @@
           "weather": "Weather entity",
           "language": "Language of messages",
           "notify_services": "Notification services",
-          "workday_entity": "Workday sensor"
+          "workday_entity": "Workday sensor",
+          "weekend_days": "Weekend days"
         },
         "data_description": {
-          "outdoor_temperature": "Used for the summer day and the temperature condition of every window.",
+          "outdoor_temperature": "For the summer day and the temperature condition of every window. Without a sensor the current temperature of the weather entity is used (at least one of both).",
           "weather": "Its daily forecast decides at the day change whether today is a summer day.",
           "language": "Logbook, last reason and push messages.",
-          "notify_services": "Get a message when an open window prevents the sun protection (e.g. notify.mobile_app_phone).",
-          "workday_entity": "Optional, for the morning opening by time (e.g. the Workday integration). Without it Monday to Friday are workdays."
+          "notify_services": "Get a message when an open window prevents sun protection (notify services only, e.g. notify.mobile_app_phone).",
+          "workday_entity": "Optional, for the morning opening by time (e.g. Workday integration, knows public holidays). Without a sensor the weekend days decide.",
+          "weekend_days": "Only without a workday sensor: on these days the weekend time of the morning opening applies."
         }
       },
       "override": {
@@ -110,13 +121,15 @@
           "summer_threshold": "Summer day from forecast high",
           "night_threshold": "Late summer day only with a night from",
           "heating_entity": "Heating wanted",
-          "day_change_time": "Day change"
+          "day_change_time": "Day change",
+          "forecast_type": "Kind of forecast"
         },
         "data_description": {
           "summer_threshold": "Without a summer day there is no sun protection. During the day the summer day also starts when the outdoor temperature rises above this value (see night).",
           "night_threshold": "A summer day only by the outdoor temperature counts only when the forecast low of the coming night is at least this value. When the night cools down (spring, autumn), the warmth stays in the house. Without a low in the forecast the summer day counts as before.",
-          "heating_entity": "Optional, e.g. the heating day of AI Heating Assistant. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are not lowered then.",
-          "day_change_time": "Forecast check and reset of the daily sun protection markers and notifications."
+          "heating_entity": "Optional, e.g. an input_boolean \"heating season\" or the heating day of a heating control. While it is on, the warmth of the sun is welcome: sun protection only when the room of a window is too warm anyway. Windows without a room temperature are then not lowered.",
+          "day_change_time": "Forecast check and reset of the daily sun protection markers and notifications.",
+          "forecast_type": "Automatic takes the first kind the weather entity supports (daily, twice daily, hourly). From hourly values the high of the day and the low of the night are calculated."
         }
       },
       "evening": {
@@ -150,7 +163,7 @@
           "vacation_evening_window": "Random period in the evening"
         },
         "data_description": {
-          "vacation_entities": "Vacation is active while one of them is on (e.g. the same helper as for the heating).",
+          "vacation_entities": "Vacation is active while one of them is on (e.g. an input_boolean \"vacation\" or a calendar).",
           "vacation_morning_start": "Closed covers of the windows in the simulation open at a random time after this.",
           "vacation_morning_window": "Each window opens at a random time within this period.",
           "vacation_position_min": "Random position between both values.",
@@ -169,15 +182,31 @@
           "startup_delay": "No movement for this time after Home Assistant started (sensors and covers are still coming online).",
           "catch_up_after": "After the restart protection the evening run is caught up for windows not yet closed this evening, but only after this time."
         }
+      },
+      "advanced": {
+        "title": "Advanced",
+        "description": "Settings that are rarely needed.",
+        "data": {
+          "window_closed_delay": "Window counts as closed after",
+          "show_panel": "Dashboard in the sidebar"
+        },
+        "data_description": {
+          "window_closed_delay": "A window contact must report closed this long before closing after the window, sun protection or the close trigger act (against bouncing contacts).",
+          "show_panel": "Off: the dashboard disappears from the sidebar but stays reachable with \"Configure\" at the integration."
+        }
       }
     },
     "error": {
-      "latest_before_earliest": "The latest time must not be before the earliest time.",
-      "night_end_after_evening": "The end of the night must be before the earliest evening time.",
-      "min_above_max": "Minimum must not be above maximum.",
+      "latest_before_earliest": "The latest time is before the earliest one. Move the latest time later or the earliest earlier.",
+      "night_end_after_evening": "The end of the night must be before the earliest evening start, e.g. 03:30 with an evening from 17:00.",
+      "min_above_max": "The minimum is above the maximum. Swap or adjust the values.",
       "name_required": "Please enter a name.",
       "azimuth_equal": "Azimuth from and to must differ.",
-      "no_lux_sensor": "The group of this window has no brightness sensor."
+      "no_lux_sensor": "The group of this window has no brightness sensor. Add a brightness sensor to the group or choose another mode.",
+      "need_temperature_source": "Choose an outdoor temperature sensor or a weather entity; without a temperature there is no summer day.",
+      "not_numeric": "This entity does not report a number. Choose a sensor with a measured value (e.g. °C, lx, W, W/m²).",
+      "invalid_notify_service": "Only notification services (notify.…) are allowed. Choose a service from the list.",
+      "cover_in_use": "This cover is already controlled by another window. Choose another cover or change the other window."
     }
   },
   "config_subentries": {
@@ -203,8 +232,8 @@
             "name": "Also used for the device and its entities.",
             "azimuth_from": "Sun direction from which the sun shines on the windows (90 ° = east, 180 ° = south, 270 ° = west). The bounds themselves do not count.",
             "azimuth_to": "When the sun reaches this direction, protected covers open again (auto up).",
-            "radiation_sensors": "e.g. direct radiation from Open-Meteo (W/m²).",
-            "pv_sensors": "e.g. the input of a balcony power plant facing this direction (W).",
+            "radiation_sensors": "Solar radiation in W/m², e.g. from a weather service or a weather station.",
+            "pv_sensors": "Power of a solar system or panel facing this direction (W).",
             "lux_sensors": "Lux sensors at the windows. Every sensor of the group must reach the threshold of the window."
           }
         },
@@ -223,19 +252,23 @@
             "name": "Also used for the device and its entities.",
             "azimuth_from": "Sun direction from which the sun shines on the windows (90 ° = east, 180 ° = south, 270 ° = west). The bounds themselves do not count.",
             "azimuth_to": "When the sun reaches this direction, protected covers open again (auto up).",
-            "radiation_sensors": "e.g. direct radiation from Open-Meteo (W/m²).",
-            "pv_sensors": "e.g. the input of a balcony power plant facing this direction (W).",
+            "radiation_sensors": "Solar radiation in W/m², e.g. from a weather service or a weather station.",
+            "pv_sensors": "Power of a solar system or panel facing this direction (W).",
             "lux_sensors": "Lux sensors at the windows. Every sensor of the group must reach the threshold of the window."
           }
         }
       },
       "error": {
-        "latest_before_earliest": "The latest time must not be before the earliest time.",
-        "night_end_after_evening": "The end of the night must be before the earliest evening time.",
-        "min_above_max": "Minimum must not be above maximum.",
+        "latest_before_earliest": "The latest time is before the earliest one. Move the latest time later or the earliest earlier.",
+        "night_end_after_evening": "The end of the night must be before the earliest evening start, e.g. 03:30 with an evening from 17:00.",
+        "min_above_max": "The minimum is above the maximum. Swap or adjust the values.",
         "name_required": "Please enter a name.",
         "azimuth_equal": "Azimuth from and to must differ.",
-        "no_lux_sensor": "The group of this window has no brightness sensor."
+        "no_lux_sensor": "The group of this window has no brightness sensor. Add a brightness sensor to the group or choose another mode.",
+        "need_temperature_source": "Choose an outdoor temperature sensor or a weather entity; without a temperature there is no summer day.",
+        "not_numeric": "This entity does not report a number. Choose a sensor with a measured value (e.g. °C, lx, W, W/m²).",
+        "invalid_notify_service": "Only notification services (notify.…) are allowed. Choose a service from the list.",
+        "cover_in_use": "This cover is already controlled by another window. Choose another cover or change the other window."
       },
       "abort": {
         "reconfigure_successful": "Changes saved."
@@ -292,7 +325,7 @@
             "lux_threshold": "Every brightness sensor of the group must reach this value.",
             "temperature_threshold": "Sun protection only from this outdoor temperature on.",
             "temperature_hold": "The outdoor temperature must stay above the value this long. Below it the condition ends immediately.",
-            "room_entity": "Optional: thermostat (climate, e.g. from AI Heating Assistant) or temperature sensor of the room. Then the cover is only lowered when the room is too warm. Without a value the condition counts as met (except on a heating day).",
+            "room_entity": "Optional: thermostat (climate) or temperature sensor of the room. Then the cover is only lowered when the room is too warm. Without a value the condition counts as met (except on a heating day).",
             "room_margin": "With a thermostat: too warm from its setpoint plus this margin.",
             "room_threshold": "With a temperature sensor (or a thermostat without a setpoint): too warm from this temperature.",
             "cooling_entity": "Optional: while this air conditioner cools, the room counts as too warm. Sun protection then takes load off the air conditioner.",
@@ -319,7 +352,8 @@
               },
               "data_description": {
                 "override_duration": "After a manual movement the automatic pauses this long for the window. Every further movement starts it again. 0 = until sunrise.",
-                "override_ignore_evening": "e.g. bedrooms that should always close in the evening."
+                "override_ignore_evening": "e.g. bedrooms that should always close in the evening.",
+                "override_sunrise_reset": "The override also ends at the next sunrise, even if the duration is still running."
               }
             },
             "conditions": {
@@ -338,7 +372,13 @@
               "data_description": {
                 "open_block_entity": "No automatic opening (auto up, ventilation, vacation morning, morning opening) unless this entity has one of the free states (e.g. a TV).",
                 "close_trigger_entities": "When one of these entities becomes active, the cover closes once per active cycle, only with a closed window (otherwise as soon as it is closed). The cycle ends when all are inactive.",
-                "window_exception_entity": "While this entity is available, an open window does not prevent closing movements and no message is sent (e.g. an air conditioner with its hose through the balcony door). Not used for the vacation evening."
+                "window_exception_entity": "While this entity is available, an open window does not prevent closing movements and no message is sent (e.g. an air conditioner with its hose through the balcony door). Not used for the vacation evening.",
+                "open_block_free_states": "States of the opening block in which opening is still allowed (e.g. off, standby).",
+                "close_trigger_active_states": "States in which a close trigger counts as active (e.g. on, playing for a TV).",
+                "close_trigger_on_delay": "A trigger must be active this long before the cover closes (switching on briefly does not count).",
+                "close_trigger_off_delay": "All triggers must be inactive this long before the cycle ends and switching on closes again.",
+                "close_trigger_min_position": "Only closes when the cover is open further than this position.",
+                "close_trigger_max_lock": "After this time at the latest a new cycle starts, even if the triggers were active all the time."
               }
             },
             "evening": {
@@ -374,7 +414,9 @@
                 "ventilation": "Opening the window moves a closed cover to the ventilation position (in the evening after the short delay, during the day after the long one).",
                 "closed_position": "Used for ventilation and the vacation morning.",
                 "ventilation_delay_day": "The window must still be open afterwards.",
-                "vacation": "Take part in the random opening and closing during vacation."
+                "vacation": "Take part in the random opening and closing during vacation.",
+                "ventilation_position": "Position for ventilation (100 % = open).",
+                "ventilation_delay_evening": "In the evening mode the cover moves to the ventilation position after this short time."
               }
             }
           }
@@ -393,7 +435,10 @@
           "data_description": {
             "morning_latest": "If nothing triggered until then, the cover opens at this time.",
             "morning_position": "100 = open, less = partial opening.",
-            "morning_sun_position": "If the sun condition applies, open only to the sun protection position."
+            "morning_sun_position": "If the sun condition applies, open only to the sun protection position.",
+            "morning_enabled": "Open the cover automatically in the morning.",
+            "morning_mode": "What starts the morning opening; its settings follow in the next step.",
+            "morning_earliest": "The cover never opens before this time, even if the trigger comes earlier."
           }
         },
         "morning_time": {
@@ -401,6 +446,10 @@
           "data": {
             "morning_time_workday": "Workdays",
             "morning_time_weekend": "Weekend and holidays"
+          },
+          "data_description": {
+            "morning_time_workday": "Time on workdays (workday sensor or weekend days).",
+            "morning_time_weekend": "Time on weekends and public holidays (holidays only with a workday sensor)."
           }
         },
         "morning_sun": {
@@ -411,7 +460,9 @@
             "morning_sun_offset": "Offset"
           },
           "data_description": {
-            "morning_sun_elevation": "Only for sun elevation: opens when the rising sun passes this elevation."
+            "morning_sun_elevation": "Only for sun elevation: opens when the rising sun passes this elevation.",
+            "morning_sun_event": "Sunrise or the sun reaching an elevation.",
+            "morning_sun_offset": "Minutes before (negative) or after the event."
           }
         },
         "morning_brightness": {
@@ -421,7 +472,8 @@
             "morning_lux_hold": "Hold time"
           },
           "data_description": {
-            "morning_lux_threshold": "Every brightness sensor of the group must reach this value."
+            "morning_lux_threshold": "Every brightness sensor of the group must reach this value.",
+            "morning_lux_hold": "It must be bright enough this long before the cover opens."
           }
         },
         "morning_trigger": {
@@ -447,12 +499,16 @@
         }
       },
       "error": {
-        "latest_before_earliest": "The latest time must not be before the earliest time.",
-        "night_end_after_evening": "The end of the night must be before the earliest evening time.",
-        "min_above_max": "Minimum must not be above maximum.",
+        "latest_before_earliest": "The latest time is before the earliest one. Move the latest time later or the earliest earlier.",
+        "night_end_after_evening": "The end of the night must be before the earliest evening start, e.g. 03:30 with an evening from 17:00.",
+        "min_above_max": "The minimum is above the maximum. Swap or adjust the values.",
         "name_required": "Please enter a name.",
         "azimuth_equal": "Azimuth from and to must differ.",
-        "no_lux_sensor": "The group of this window has no brightness sensor."
+        "no_lux_sensor": "The group of this window has no brightness sensor. Add a brightness sensor to the group or choose another mode.",
+        "need_temperature_source": "Choose an outdoor temperature sensor or a weather entity; without a temperature there is no summer day.",
+        "not_numeric": "This entity does not report a number. Choose a sensor with a measured value (e.g. °C, lx, W, W/m²).",
+        "invalid_notify_service": "Only notification services (notify.…) are allowed. Choose a service from the list.",
+        "cover_in_use": "This cover is already controlled by another window. Choose another cover or change the other window."
       },
       "abort": {
         "reconfigure_successful": "Changes saved."
@@ -485,6 +541,25 @@
       "options": {
         "movement": "Only when the cover really moves",
         "command": "With every command by hand, also without movement"
+      }
+    },
+    "weekday": {
+      "options": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
+    },
+    "forecast_type": {
+      "options": {
+        "auto": "Automatic",
+        "daily": "Daily",
+        "twice_daily": "Twice daily",
+        "hourly": "Hourly"
       }
     }
   },
@@ -539,6 +614,10 @@
     "missing_group": {
       "title": "Group of a window is missing",
       "description": "The window {window} refers to a deleted group and has no sun protection. Choose a group in the settings of the window."
+    },
+    "forecast_unsupported": {
+      "title": "Weather entity provides no forecast",
+      "description": "{weather} supports none of the forecast kinds daily, twice daily or hourly. The summer day then only starts by the outdoor temperature. Choose another weather entity in the settings of Shutter Assistant."
     }
   }
 }

@@ -95,13 +95,24 @@ async def test_save_options(hass: HomeAssistant, base_states, hass_ws_client) ->
     msg = await _send(
         client,
         type="shutter_assistant/save_options",
-        options={"summer_threshold": 99, "outdoor_temperature": "", "weather": "light.x"},
+        options={"summer_threshold": 99, "weather": "light.x"},
     )
     assert msg["result"]["errors"] == {
         "summer_threshold": "invalid_value",
-        "outdoor_temperature": "required",
         "weather": "invalid_value",
     }
+    # without outdoor sensor and weather entity there is no temperature
+    msg = await _send(
+        client, type="shutter_assistant/save_options", options={"outdoor_temperature": ""}
+    )
+    assert msg["result"]["errors"] == {"outdoor_temperature": "need_temperature_source"}
+    # only notification services
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_options",
+        options={"notify_services": ["homeassistant.restart"]},
+    )
+    assert msg["result"]["errors"] == {"notify_services": "invalid_notify_service"}
     assert entry.options["summer_threshold"] == 25
 
     msg = await _send(
@@ -122,7 +133,7 @@ async def test_every_field_can_be_saved(hass: HomeAssistant, base_states) -> Non
     entry = make_entry()
     await setup_entry(hass, entry)
     options = {_key(m) for m in _option_fields(hass, {**DEFAULTS})}
-    windows = {_key(m) for m in _all_window_fields(entry, {**WINDOW_DEFAULTS})}
+    windows = {_key(m) for m in _all_window_fields(entry, {**WINDOW_DEFAULTS}, "°C")}
     assert options - OPTION_KEYS == set()
     assert windows - WINDOW_KEYS == set()
 
@@ -449,3 +460,66 @@ async def test_house_and_walls(hass: HomeAssistant, base_states, hass_ws_client)
         data={"wall": None},
     )
     assert "wall" not in entry.subentries[WINDOW_ID].data
+
+
+async def test_commands_need_an_admin(
+    hass: HomeAssistant, base_states, hass_ws_client, hass_read_only_access_token
+) -> None:
+    await setup_entry(hass, make_entry())
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    for msg in (
+        {"type": "shutter_assistant/config"},
+        {"type": "shutter_assistant/save_options", "options": {}},
+        {"type": "shutter_assistant/end_override", "window_id": WINDOW_ID},
+    ):
+        result = await _send(client, **msg)
+        assert not result["success"]
+        assert result["error"]["code"] == "unauthorized"
+
+
+async def test_cover_and_sensor_checks(hass: HomeAssistant, base_states, hass_ws_client) -> None:
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    client = await hass_ws_client(hass)
+    # a second window for the same cover
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        data={"name": "Copy", "cover": COVER},
+    )
+    assert msg["result"]["errors"] == {"cover": "cover_in_use"}
+    # the own window may keep its cover
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_WINDOW,
+        subentry_id=WINDOW_ID,
+        data={"cover": COVER},
+    )
+    assert "errors" not in msg["result"]
+    # a sun sensor without a number
+    hass.states.async_set("sensor.weather_text", "sunny")
+    msg = await _send(
+        client,
+        type="shutter_assistant/save_subentry",
+        subentry_type=SUBENTRY_GROUP,
+        data={
+            "name": "East",
+            "azimuth_from": 0,
+            "azimuth_to": 180,
+            "lux_sensors": ["sensor.weather_text"],
+        },
+    )
+    assert msg["result"]["errors"] == {"lux_sensors": "not_numeric"}
+
+
+async def test_config_payload_has_the_temperature_unit(
+    hass: HomeAssistant, base_states, hass_ws_client
+) -> None:
+    await setup_entry(hass, make_entry())
+    client = await hass_ws_client(hass)
+    msg = await _send(client, type="shutter_assistant/config")
+    assert msg["result"]["temperature_unit"] == "°C"
+    assert msg["result"]["interval_unit"] == "K"
+    assert msg["result"]["fields"]["summer_threshold"]["number"]["unit_of_measurement"] == "°C"

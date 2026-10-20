@@ -18,8 +18,10 @@ SUBENTRY_WINDOW: Final = "window"
 STORAGE_VERSION: Final = 1
 EVENT_LOGBOOK: Final = f"{DOMAIN}_logbook"
 
-# Window contacts are debounced before they count as closed.
-WINDOW_CLOSED_DEBOUNCE: Final = 5
+# Window contacts are debounced before they count as closed (default, seconds).
+CONF_WINDOW_DEBOUNCE = "window_closed_delay"
+# Show the panel in the sidebar (it stays reachable from the integration page).
+CONF_SHOW_PANEL = "show_panel"
 
 # ---------- global options ----------
 CONF_WEATHER = "weather"
@@ -27,6 +29,9 @@ CONF_OUTDOOR_TEMP = "outdoor_temperature"
 CONF_LANGUAGE = "language"
 CONF_NOTIFY = "notify_services"
 CONF_WORKDAY = "workday_entity"
+# Days without work when there is no workday sensor.
+CONF_WEEKEND_DAYS = "weekend_days"
+WEEKDAYS: Final = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 CONF_SUMMER_THRESHOLD = "summer_threshold"
 # A summer day only by the outdoor temperature needs a forecast low of the
@@ -36,6 +41,13 @@ CONF_NIGHT_THRESHOLD = "night_threshold"
 # then the warmth of the sun is welcome unless a room is too warm.
 CONF_HEATING_ENTITY = "heating_entity"
 CONF_DAY_CHANGE = "day_change_time"
+# Kind of forecast: "auto" takes the first the weather entity supports.
+CONF_FORECAST_TYPE = "forecast_type"
+FORECAST_AUTO = "auto"
+FORECAST_DAILY = "daily"
+FORECAST_TWICE_DAILY = "twice_daily"
+FORECAST_HOURLY = "hourly"
+FORECAST_TYPES: Final = [FORECAST_AUTO, FORECAST_DAILY, FORECAST_TWICE_DAILY, FORECAST_HOURLY]
 
 CONF_EVENING_EARLIEST = "evening_earliest"
 CONF_EVENING_ELEVATION = "evening_elevation"
@@ -66,9 +78,11 @@ LANGUAGE_OPTIONS: Final = ["auto", "de", "en"]
 DEFAULTS: Final[dict[str, object]] = {
     CONF_LANGUAGE: "auto",
     CONF_NOTIFY: [],
+    CONF_WEEKEND_DAYS: ["sat", "sun"],
     CONF_SUMMER_THRESHOLD: 23.0,
     CONF_NIGHT_THRESHOLD: 14.0,
     CONF_DAY_CHANGE: "01:00:00",
+    CONF_FORECAST_TYPE: FORECAST_AUTO,
     CONF_EVENING_EARLIEST: "17:00:00",
     CONF_EVENING_ELEVATION: -4.0,
     CONF_EVENING_LATEST: "21:00:00",
@@ -84,6 +98,8 @@ DEFAULTS: Final[dict[str, object]] = {
     CONF_STARTUP_DELAY: 5,
     CONF_CATCH_UP_AFTER: "12:00:00",
     CONF_OVERRIDE_TRIGGER: TRIGGER_MOVEMENT,
+    CONF_WINDOW_DEBOUNCE: 5,
+    CONF_SHOW_PANEL: True,
 }
 
 # ---------- house (only in the panel: drawn in the sun compass) ----------

@@ -2,11 +2,11 @@
 
 [English version](README.en.md)
 
-Custom Integration für Home Assistant, die Rollos und Raffstores automatisch steuert: Sonnenschutz nach Himmelsrichtung, Abendmodus, Lüftungsposition, manuelle Übersteuerung, Morgenöffnung und Urlaubssimulation. Alles wird in der Oberfläche eingestellt, nichts ist fest im Code. Es gibt keine KI und kein Lernen, die Regeln sind nachvollziehbar und jede Fahrt steht mit Grund im Logbuch.
+Custom Integration für Home Assistant, die Rollos und Raffstores automatisch steuert (die Behanghöhe; Lamellen werden nicht gewendet): Sonnenschutz nach Himmelsrichtung, Abendmodus, Lüftungsposition, manuelle Übersteuerung, Morgenöffnung und Urlaubssimulation. Alles wird in der Oberfläche eingestellt, nichts ist fest im Code. Es gibt keine KI und kein Lernen, die Regeln sind nachvollziehbar und jede Fahrt steht mit Grund im Logbuch.
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.3.2.
+> Status: Version 0.4.0.
 
 ## Funktionsweise
 
@@ -21,7 +21,7 @@ Die Integration arbeitet ereignisgesteuert: Sie reagiert nur auf Zustandswechsel
 
 * **Sommertag:** Sonnenschutz gibt es nur an Sommertagen. Beim Tageswechsel (Standard 01:00) wird die Höchsttemperatur der Tagesvorhersage geprüft. Steigt die Außentemperatur tagsüber über die Schwelle, wird es ebenfalls ein Sommertag, aber nur, wenn der Vorhersage-Tiefstwert der kommenden Nacht mindestens 14 °C beträgt (einstellbar). Ein warmer Nachmittag im Frühling oder Herbst mit kühler Nacht löst also keinen Sonnenschutz aus. Ohne Tiefstwert in der Vorhersage gilt der Sommertag wie bisher.
 * **Sonnenbedingung je Fenster:** Sommertag UND Außentemperatur über der Schwelle des Fensters (mit Haltezeit) UND jeder Sonnensensor der Gruppe über seiner Schwelle. Das Ganze muss die Sonnen-Haltezeit lang erfüllt sein und endet sofort. Nach einem Neustart wird sofort ausgewertet, die Haltezeit läuft ab dem Start.
-* **Wärmebedarf (optional):** Mit einer **Raumtemperatur** je Fenster wird nur abgesenkt, wenn der Raum zu warm ist: bei einem Thermostat (climate, z. B. vom [AI Heating Assistant](https://github.com/Jumpmaster2/AI-Heating-Assistant)) ab Sollwert + 2 K, bei einem Temperatursensor ab 24 °C. Kühlt die gewählte **Klimaanlage**, gilt der Raum als zu warm, der Sonnenschutz entlastet sie. Meldet sie keine Aktion (z. B. Midea), zählt der Modus „Kühlen“ und im Modus „Auto“ eine Raumtemperatur über ihrem Sollwert. Ist die globale **Heizbedarf**-Entität an (z. B. der Heiztag des AI Heating Assistant), ist Sonnenwärme erwünscht: Abgesenkt wird dann nur, wenn der Raum trotzdem zu warm ist. Fenster ohne Raumtemperatur bleiben dann oben. Das Wiederöffnen ist davon unabhängig, es hängt weiter nur am Sonnenstand.
+* **Wärmebedarf (optional):** Mit einer **Raumtemperatur** je Fenster wird nur abgesenkt, wenn der Raum zu warm ist: bei einem Thermostat (climate) ab Sollwert + 2 K, bei einem Temperatursensor ab 24 °C. Kühlt die gewählte **Klimaanlage**, gilt der Raum als zu warm, der Sonnenschutz entlastet sie. Meldet sie keine Aktion (z. B. Midea), zählt der Modus „Kühlen“ und im Modus „Auto“ eine Raumtemperatur über ihrem Sollwert. Ist die globale **Heizbedarf**-Entität an (z. B. ein input_boolean „Heizperiode“), ist Sonnenwärme erwünscht: Abgesenkt wird dann nur, wenn der Raum trotzdem zu warm ist. Fenster ohne Raumtemperatur bleiben dann oben. Das Wiederöffnen ist davon unabhängig, es hängt weiter nur am Sonnenstand.
 * **Absenken:** Steht die Sonne im Bereich der Gruppe und gilt die Sonnenbedingung, fährt das Rollo einmal am Tag auf die Sonnenschutz-Position. Ist es schon weiter zu, wird es nur vorgemerkt und bleibt in Ruhe. Ein offenes Fenster verhindert die Fahrt; dann gibt es einmal am Tag eine Benachrichtigung (pro Fenster abschaltbar), aber nur wenn wirklich eine Fahrt verhindert wurde. Nach dem Schließen des Fensters wird nachgeholt.
 * **Auto-Hoch:** Verlässt die Sonne den Bereich, öffnet das Rollo wieder, aber nur wenn es noch auf der Sonnenschutz-Position steht (bis zur Toleranz darüber). Von Hand anders gestellte Rollos bleiben, wie sie sind. Kein Auto-Hoch im Abendmodus, bei Übersteuerung oder Öffnungssperre. Pro Fenster abschaltbar.
 * **Manuellen Sonnenschutz erkennen:** Fährt jemand bei Sonne ein Rollo von Hand weit genug herunter (Standard höchstens 25 %), gilt das als Sonnenschutz für heute. Optional zählt auch jede Fahrt genau auf die Sonnenschutz-Position.
@@ -51,7 +51,7 @@ Modi: feste Uhrzeit (Werktag sowie Wochenende und Feiertag über einen optionale
 
 ### Urlaubssimulation
 
-Solange eine der Urlaubs-Entitäten an ist (z. B. derselbe Helfer wie für die Heizung), ruht der normale Abendlauf. Stattdessen öffnen die teilnehmenden Fenster morgens zu einer zufälligen Zeit (Standard 07:00 bis 08:00) auf eine zufällige Position (60 bis 100 %) und schließen abends zufällig (19:00 bis 20:30). Sonnenschutz und Lüften laufen weiter.
+Solange eine der Urlaubs-Entitäten an ist (z. B. ein input_boolean „Urlaub“), ruht der normale Abendlauf. Stattdessen öffnen die teilnehmenden Fenster morgens zu einer zufälligen Zeit (Standard 07:00 bis 08:00) auf eine zufällige Position (60 bis 100 %) und schließen abends zufällig (19:00 bis 20:30). Sonnenschutz und Lüften laufen weiter.
 
 ### Neustart-Schutz
 
@@ -65,7 +65,16 @@ Nach dem Start von Home Assistant gibt es einige Minuten (Standard 5) keine Fahr
 4. **Einstellungen > Geräte & Dienste > Integration hinzufügen > Shutter Assistant**.
 5. Gruppen und Fenster im Dashboard **Shutter Assistant** (Seitenleiste) anlegen.
 
-Voraussetzung: Home Assistant 2026.10 oder neuer.
+Voraussetzung: Home Assistant 2026.10 oder neuer und die Integration **Sonne** (Sun, standardmäßig eingerichtet). Eine Wetter-Entität mit Vorhersage und ein Werktag-Sensor sind optional.
+
+## Manuelle Installation
+
+1. Die neueste Version herunterladen und den Ordner `custom_components/shutter_assistant` in den Ordner `config/custom_components/` von Home Assistant kopieren.
+2. Home Assistant neu starten und die Integration wie oben beschrieben hinzufügen.
+
+## Temperatur-Einheiten
+
+Alle Temperaturen (Schwellen, Vorhersage, Raum) gelten in der Einheit des Einheitensystems von Home Assistant. Bei °F werden die Standardwerte umgerechnet (Sommertag ab 73 °F, Nacht ab 57 °F, Außentemperatur ab 66 °F, Raum ab 75 °F, Sollwert plus 4 °F). Wird das Einheitensystem später umgestellt, die Schwellen bitte von Hand anpassen.
 
 ## Konfiguration
 
@@ -85,15 +94,17 @@ Die Werte werden genauso geprüft wie in den Dialogen (gleiche Bereiche, Einheit
 
 | Option | Standard | Bedeutung |
 |---|---|---|
-| Außentemperatur-Sensor | | Pflicht |
-| Wetter-Entität | | Tagesvorhersage für den Sommertag |
+| Außentemperatur-Sensor | | ohne Sensor gilt die aktuelle Temperatur der Wetter-Entität (mindestens eins von beiden) |
+| Wetter-Entität | die einzige, falls es genau eine gibt | Vorhersage für den Sommertag |
 | Sprache der Meldungen | wie Home Assistant | Deutsch oder Englisch für Logbuch, letzten Grund und Push |
-| Benachrichtigungsdienste | | z. B. `notify.mobile_app_phone` |
-| Werktag-Sensor | | optional, für die Morgenöffnung (z. B. Workday-Integration) |
+| Benachrichtigungsdienste | | nur `notify.*`, z. B. `notify.mobile_app_phone` |
+| Werktag-Sensor | | optional, für die Morgenöffnung (z. B. Workday-Integration, kennt Feiertage) |
+| Wochenendtage | Samstag, Sonntag | nur ohne Werktag-Sensor |
 | Sommertag ab | 23 °C | Höchsttemperatur der Vorhersage |
 | Später Sommertag nur bei Nacht ab | 14 °C | Tiefstwert der kommenden Nacht, wenn erst die Außentemperatur den Sommertag auslöst |
-| Heizbedarf | | optional, z. B. `binary_sensor.…_heating_day`; an = Sonnenwärme erwünscht |
+| Heizbedarf | | optional, z. B. ein `input_boolean` „Heizperiode“; an = Sonnenwärme erwünscht |
 | Tageswechsel | 01:00 | Vorhersage prüfen, Tagesmarker zurücksetzen |
+| Vorhersage-Art | automatisch | täglich, zweimal täglich oder stündlich; automatisch nimmt die erste, die die Wetter-Entität kann |
 | Abendmodus frühestens, Sonnenhöhe, spätestens | 17:00, -4 °, 21:00 | |
 | Ende der Nacht | 03:30 | |
 | Nachziehen ab | 16:00 | |
@@ -104,6 +115,8 @@ Die Werte werden genauso geprüft wie in den Dialogen (gleiche Bereiche, Einheit
 | Übersteuerung beginnt | nur bei echter Fahrt | oder bei jedem Befehl von Hand, auch ohne Fahrt |
 | Neustart-Schutz | 5 min | |
 | Abendlauf nachholen ab | 12:00 | |
+| Fenster gilt als geschlossen nach (Erweitert) | 5 s | Entprellung der Fensterkontakte |
+| Dashboard in der Seitenleiste (Erweitert) | an | aus: nur noch über „Einstellungen“ bei der Integration erreichbar |
 
 ### Gruppen
 
@@ -140,6 +153,52 @@ Für Kontroll-Karten im Dashboard liefern **Sonnenbedingung** (Schwellen, Sensor
 
 Jede Fahrt und jede Übersteuerung steht mit Grund im **Logbuch**.
 
+## Eigene Dashboard-Karten
+
+Die Attribute der Entitäten lassen sich in eigenen Karten verwenden, zum Beispiel:
+
+```yaml
+type: entities
+title: Wohnzimmer
+entities:
+  - entity: sensor.wohnzimmer_status
+  - entity: binary_sensor.wohnzimmer_sonnenbedingung
+    secondary_info: last-changed
+  - type: attribute
+    entity: sensor.wohnzimmer_status
+    attribute: evening_start
+    name: Abend ab
+  - type: attribute
+    entity: binary_sensor.wohnzimmer_sonnenbedingung
+    attribute: condition_on_at
+    name: Sonnenbedingung erfüllt ab
+```
+
+„Sonnenbedingung“, „Letzter Grund“ und „Vorhersage Höchsttemperatur“ sind Diagnose-Entitäten. Die Attribute von „Sonnenbedingung“ und „Status“ werden nicht im Verlauf gespeichert (sie ändern sich oft).
+
+## Fehlerbehebung
+
+* **Kein Sonnenschutz:** im Dashboard den **Sonnenbedingung-Check** des Fensters öffnen. Jede Teilbedingung zeigt Wert und Schwelle. Häufige Gründe: kein Sommertag (Vorhersage unter der Schwelle), keine Gruppe, ein Sonnensensor unter der Schwelle, die Haltezeit läuft noch, offenes Fenster, aktive Übersteuerung.
+* **Übersteuerung startet ungewollt:** „Nur wenn das Rollo wirklich fährt“ wählen (Dashboard **Allgemein**, Karte **Manuelle Übersteuerung**). Fahrten anderer Automationen und Skripte zählen nie.
+* **Keine Vorhersage:** Dashboard und Reparaturen zeigen einen Hinweis, wenn die Wetter-Entität keine Vorhersage liefert. Vorhersage-Art oder eine andere Wetter-Entität wählen.
+* **Rollo fährt nicht auf eine Position:** Rollos ohne Positionsunterstützung können nur auf und zu (im Log steht eine Warnung).
+* **Diagnose:** Einstellungen > Geräte & Dienste > Shutter Assistant > ⋮ > Diagnose herunterladen (Benachrichtigungsdienste sind geschwärzt).
+
+### Debug-Log
+
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.shutter_assistant: debug
+```
+
+Oder bei der Integration: ⋮ > **Debug-Protokollierung aktivieren**.
+
+## Entfernen
+
+Einstellungen > Geräte & Dienste > Shutter Assistant > ⋮ > **Löschen**. Gespeicherter Zustand (Übersteuerungen, Marker), Dashboard und Reparaturhinweise werden entfernt. Danach den Ordner bzw. den HACS-Download entfernen.
+
 ## Umstieg von YAML-Automationen
 
 Siehe [docs/migration.md](docs/migration.md).
@@ -153,7 +212,7 @@ pytest
 
 Die Beschriftungen des Dashboards (`frontend/labels.js`) werden aus den Übersetzungen erzeugt: nach einer Änderung an `translations/*.json` einmal `python scripts/gen_labels.py` ausführen (ein Test prüft das).
 
-Die Regeln in `custom_components/shutter_assistant/logic/` haben keine Abhängigkeit zu Home Assistant und sind einzeln testbar. Die Tests mit Home Assistant brauchen Linux oder macOS (sie laufen auch in GitHub Actions).
+Die Regeln in `custom_components/shutter_assistant/logic/` haben keine Abhängigkeit zu Home Assistant und sind einzeln testbar. Die Tests mit Home Assistant brauchen Linux oder macOS (sie laufen auch in GitHub Actions). Linter: `ruff check custom_components tests scripts`.
 
 ## Lizenz
 

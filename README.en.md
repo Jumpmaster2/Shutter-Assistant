@@ -2,11 +2,11 @@
 
 [Deutsche Version](README.md)
 
-Custom integration for Home Assistant that controls roller shutters and blinds automatically: sun protection per direction, evening mode, ventilation position, manual override, morning opening and vacation simulation. Everything is set up in the user interface, nothing is hard coded. There is no AI and no learning; the rules are easy to follow and every movement is written to the logbook with its reason.
+Custom integration for Home Assistant that controls roller shutters and blinds automatically (the height of the cover; slats of venetian blinds are not tilted): sun protection per direction, evening mode, ventilation position, manual override, morning opening and vacation simulation. Everything is set up in the user interface, nothing is hard coded. There is no AI and no learning; the rules are easy to follow and every movement is written to the logbook with its reason.
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.3.2.
+> Status: version 0.4.0.
 
 ## How it works
 
@@ -21,7 +21,7 @@ The integration is event driven: it only reacts to state changes of the configur
 
 * **Summer day:** sun protection only happens on summer days. At the day change (default 01:00) the high of the daily forecast is checked. If the outdoor temperature rises above the threshold during the day, it becomes a summer day as well, but only when the forecast low of the coming night is at least 14 °C (adjustable). A warm afternoon in spring or autumn with a cool night therefore does not start sun protection. Without a low in the forecast the summer day counts as before.
 * **Sun condition per window:** summer day AND outdoor temperature above the threshold of the window (with hold time) AND every sun sensor of the group above its threshold. All of it must be fulfilled for the sun hold time and ends immediately. After a restart it is evaluated right away; the hold time starts at the start.
-* **Heat need (optional):** with a **room temperature** per window the cover is only lowered when the room is too warm: with a thermostat (climate, e.g. from [AI Heating Assistant](https://github.com/Jumpmaster2/AI-Heating-Assistant)) from setpoint + 2 K, with a temperature sensor from 24 °C. While the chosen **air conditioner** cools, the room counts as too warm and sun protection takes load off it. If it reports no action (e.g. Midea), the mode "cool" counts, and in the mode "auto" a room temperature above its target. While the global **heating wanted** entity is on (e.g. the heating day of AI Heating Assistant), the warmth of the sun is welcome: the cover is only lowered when the room is too warm anyway; windows without a room temperature stay up. Opening again does not depend on this, it still only follows the sun.
+* **Heat need (optional):** with a **room temperature** per window the cover is only lowered when the room is too warm: with a thermostat (climate) from setpoint + 2 K, with a temperature sensor from 24 °C. While the chosen **air conditioner** cools, the room counts as too warm and sun protection takes load off it. If it reports no action (e.g. Midea), the mode "cool" counts, and in the mode "auto" a room temperature above its target. While the global **heating wanted** entity is on (e.g. an input_boolean "heating season"), the warmth of the sun is welcome: the cover is only lowered when the room is too warm anyway; windows without a room temperature stay up. Opening again does not depend on this, it still only follows the sun.
 * **Lowering:** when the sun is in the sector of the group and the sun condition applies, the cover moves once a day to the sun protection position. If it is already further closed it is only marked and left alone. An open window prevents the movement; a notification is sent once a day (can be switched off per window), only if a movement was really prevented. Lowering follows after the window was closed.
 * **Auto up:** when the sun leaves the sector, the cover opens again, but only if it still stands at the sun protection position (up to the tolerance above it). Covers moved elsewhere by hand stay. No auto up in the evening mode, during an override or an opening block. Can be switched off per window.
 * **Manual sun protection:** if someone lowers a cover by hand far enough while the sun shines (default at most 25 %), it counts as sun protection for today. Optionally every movement exactly onto the sun protection position counts as well.
@@ -51,7 +51,7 @@ Modes: fixed time (workday and weekend or holiday via an optional workday sensor
 
 ### Vacation simulation
 
-While one of the vacation entities is on (e.g. the same helper as for the heating), the normal evening run rests. Instead the participating windows open in the morning at a random time (default 07:00 to 08:00) to a random position (60 to 100 %) and close in the evening at random (19:00 to 20:30). Sun protection and ventilation keep running.
+While one of the vacation entities is on (e.g. an input_boolean "vacation"), the normal evening run rests. Instead the participating windows open in the morning at a random time (default 07:00 to 08:00) to a random position (60 to 100 %) and close in the evening at random (19:00 to 20:30). Sun protection and ventilation keep running.
 
 ### Restart protection
 
@@ -65,7 +65,16 @@ After Home Assistant started there are no movements for some minutes (default 5)
 4. **Settings > Devices & services > Add integration > Shutter Assistant**.
 5. Add groups and windows in the **Shutter Assistant** dashboard (sidebar).
 
-Requires Home Assistant 2026.10 or newer.
+Requires Home Assistant 2026.10 or newer and the **Sun** integration (set up by default). A weather entity with a forecast and a workday sensor are optional.
+
+## Manual installation
+
+1. Download the latest release and copy the folder `custom_components/shutter_assistant` into the folder `config/custom_components/` of Home Assistant.
+2. Restart Home Assistant and add the integration as described above.
+
+## Temperature units
+
+All temperatures (thresholds, forecast, room) are in the unit of the Home Assistant unit system. With °F the defaults are converted (summer day from 73 °F, night from 57 °F, outdoor temperature from 66 °F, room from 75 °F, setpoint plus 4 °F). If the unit system is changed later, adjust the thresholds by hand.
 
 ## Configuration
 
@@ -85,15 +94,17 @@ Values are checked exactly like in the dialogs (same ranges, units and rules). T
 
 | Option | Default | Meaning |
 |---|---|---|
-| Outdoor temperature sensor | | required |
-| Weather entity | | daily forecast for the summer day |
+| Outdoor temperature sensor | | without a sensor the current temperature of the weather entity is used (at least one of both) |
+| Weather entity | the only one, if there is exactly one | forecast for the summer day |
 | Language of messages | like Home Assistant | German or English for logbook, last reason and push |
-| Notification services | | e.g. `notify.mobile_app_phone` |
-| Workday sensor | | optional, for the morning opening (e.g. Workday integration) |
+| Notification services | | only `notify.*`, e.g. `notify.mobile_app_phone` |
+| Workday sensor | | optional, for the morning opening (e.g. Workday integration, knows public holidays) |
+| Weekend days | Saturday, Sunday | only without a workday sensor |
 | Summer day from | 23 °C | high of the forecast |
 | Late summer day only with a night from | 14 °C | low of the coming night, when only the outdoor temperature starts the summer day |
-| Heating wanted | | optional, e.g. `binary_sensor.…_heating_day`; on = warmth of the sun welcome |
+| Heating wanted | | optional, e.g. an `input_boolean` "heating season"; on = warmth of the sun welcome |
 | Day change | 01:00 | check the forecast, reset daily markers |
+| Kind of forecast | automatic | daily, twice daily or hourly; automatic takes the first the weather entity supports |
 | Evening earliest, sun elevation, latest | 17:00, -4 °, 21:00 | |
 | End of the night | 03:30 | |
 | Close after window closed, from | 16:00 | |
@@ -104,6 +115,8 @@ Values are checked exactly like in the dialogs (same ranges, units and rules). T
 | Override starts | only with a real movement | or with every command by hand, also without movement |
 | Restart protection | 5 min | |
 | Catch up the evening run from | 12:00 | |
+| Window counts as closed after (advanced) | 5 s | debounce of the window contacts |
+| Dashboard in the sidebar (advanced) | on | off: only reachable with "Configure" at the integration |
 
 ### Groups
 
@@ -140,6 +153,52 @@ For control cards on a dashboard, **Sun condition** (thresholds, sensors, azimut
 
 Every movement and every override is written to the **logbook** with its reason.
 
+## Own dashboard cards
+
+The attributes of the entities can be used in own cards, for example:
+
+```yaml
+type: entities
+title: Living room
+entities:
+  - entity: sensor.living_room_status
+  - entity: binary_sensor.living_room_sun_condition
+    secondary_info: last-changed
+  - type: attribute
+    entity: sensor.living_room_status
+    attribute: evening_start
+    name: Evening from
+  - type: attribute
+    entity: binary_sensor.living_room_sun_condition
+    attribute: condition_on_at
+    name: Sun condition met from
+```
+
+"Sun condition", "Last reason" and "Forecast high" are diagnostic entities. The attributes of "Sun condition" and "Status" are not stored in the history (they change often).
+
+## Troubleshooting
+
+* **No sun protection:** open the **sun condition check** of the window in the dashboard. Every part shows its value and threshold. Frequent reasons: no summer day (forecast below the threshold), no group, a sun sensor below the threshold, the hold time is still running, an open window, an active override.
+* **Override starts unexpectedly:** choose "only when the cover really moves" (dashboard **General**, card **Manual override**). Movements of other automations and scripts never count.
+* **No forecast:** the dashboard and the repairs page show a note when the weather entity supports no forecast. Choose the kind of forecast or another weather entity.
+* **Cover does not move to a position:** covers without position support can only be opened and closed (a warning is logged).
+* **Diagnostics:** Settings > Devices & services > Shutter Assistant > ⋮ > Download diagnostics (notification services are redacted).
+
+### Debug log
+
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.shutter_assistant: debug
+```
+
+Or at the integration: ⋮ > **Enable debug logging**.
+
+## Removal
+
+Settings > Devices & services > Shutter Assistant > ⋮ > **Delete**. The stored state (overrides, markers), the dashboard and the repair notes are removed. Remove the folder or the HACS download afterwards.
+
 ## Moving from YAML automations
 
 See [docs/migration.md](docs/migration.md).
@@ -153,7 +212,7 @@ pytest
 
 The labels of the dashboard (`frontend/labels.js`) are generated from the translations: after changing `translations/*.json` run `python scripts/gen_labels.py` once (a test checks this).
 
-The rules in `custom_components/shutter_assistant/logic/` do not depend on Home Assistant and can be tested on their own. The tests with Home Assistant need Linux or macOS (they also run in GitHub Actions).
+The rules in `custom_components/shutter_assistant/logic/` do not depend on Home Assistant and can be tested on their own. The tests with Home Assistant need Linux or macOS (they also run in GitHub Actions). Lint with `ruff check custom_components tests scripts`.
 
 ## License
 

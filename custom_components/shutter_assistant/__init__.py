@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN, PLATFORMS, STORAGE_VERSION
+from .const import CONF_SHOW_PANEL, DEFAULTS, DOMAIN, PLATFORMS, STORAGE_VERSION
 from .engine import ShutterConfigEntry, ShutterEngine
 from .entity import global_device_info
 from .panel import async_register_panel, async_unregister_panel
@@ -23,10 +24,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ShutterConfigEntry) -> b
     engine.global_device_id = device.id
     await engine.async_setup()
     entry.runtime_data = engine
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except Exception:
+        # do not leave listeners and timers behind
+        await engine.async_shutdown()
+        raise
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     async_register_websocket(hass)
-    await async_register_panel(hass, entry.entry_id)
+    show = bool(entry.options.get(CONF_SHOW_PANEL, DEFAULTS[CONF_SHOW_PANEL]))
+    await async_register_panel(hass, entry.entry_id, show)
     return True
 
 
@@ -44,6 +51,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ShutterConfigEntry) -> 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ShutterConfigEntry) -> None:
-    """Delete the stored state when the integration is removed."""
+    """Delete the stored state, the panel and the repair issues when the integration is removed."""
     async_unregister_panel(hass)
+    for domain, issue_id in list(ir.async_get(hass).issues):
+        if domain == DOMAIN:
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
     await Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}").async_remove()

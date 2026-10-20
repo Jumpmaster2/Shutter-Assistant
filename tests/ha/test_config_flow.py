@@ -144,6 +144,11 @@ async def test_window_subentry_with_group_and_morning(hass: HomeAssistant, base_
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], {"name": "Kitchen", "cover": COVER, "group": GROUP_ID}
     )
+    # the cover is already controlled by the living room
+    assert result["errors"] == {"cover": "cover_in_use"}
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"name": "Kitchen", "cover": "cover.kitchen", "group": GROUP_ID}
+    )
     assert result["step_id"] == "sun"
     schema_keys = {str(k) for k in result["data_schema"].schema}
     assert "pv_threshold" in schema_keys and "radiation_threshold" in schema_keys
@@ -236,11 +241,11 @@ async def test_window_without_group_skips_sun(hass: HomeAssistant, base_states) 
         (entry.entry_id, SUBENTRY_WINDOW), context={"source": SOURCE_USER}
     )
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {"name": " ", "cover": COVER}
+        result["flow_id"], {"name": " ", "cover": "cover.hall"}
     )
     assert result["errors"] == {"name": "name_required"}
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {"name": "Hall", "cover": COVER}
+        result["flow_id"], {"name": "Hall", "cover": "cover.hall"}
     )
     assert result["step_id"] == "behavior"
 
@@ -298,3 +303,84 @@ async def test_window_creation_steps_say_next(hass: HomeAssistant, base_states) 
         (entry.entry_id, SUBENTRY_WINDOW), context={"source": SOURCE_USER}
     )
     assert result["last_step"] is False
+
+
+async def test_options_summer_clears_the_heating_entity(hass: HomeAssistant, base_states) -> None:
+    entry = make_entry(heating_entity="binary_sensor.heating_day")
+    await setup_entry(hass, entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "summer"}
+    )
+    # a cleared optional field is missing in the input
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"summer_threshold": 24.0, "night_threshold": 14.0, "day_change_time": "01:00:00"},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert "heating_entity" not in entry.options
+    assert entry.options["summer_threshold"] == 24.0
+
+
+async def test_options_general_clears_weather(hass: HomeAssistant, base_states) -> None:
+    entry = make_entry(weather="weather.home", workday_entity="binary_sensor.workday")
+    await setup_entry(hass, entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "general"}
+    )
+    result = await hass.config_entries.options.async_configure(result["flow_id"], GENERAL)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert "weather" not in entry.options
+    assert "workday_entity" not in entry.options
+
+
+async def test_options_evening_and_startup(hass: HomeAssistant, base_states) -> None:
+    entry = make_entry()
+    await setup_entry(hass, entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "evening"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**EVENING, "evening_latest": "16:00:00"}
+    )
+    assert result["errors"] == {"evening_latest": "latest_before_earliest"}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**EVENING, "evening_earliest": "18:00:00"}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["evening_earliest"] == "18:00:00"
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "startup"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"startup_delay": 2, "catch_up_after": "13:00:00"}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["startup_delay"] == 2
+
+
+async def test_window_reconfigure_clears_room_and_cooling(hass: HomeAssistant, base_states) -> None:
+    entry = make_entry(window={"room_entity": "climate.room", "cooling_entity": "climate.ac"})
+    await setup_entry(hass, entry)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_WINDOW),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": WINDOW_ID},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"next_step_id": "sun"}
+    )
+    values = {
+        str(k): k.default()
+        for k in result["data_schema"].schema
+        if callable(k.default) and str(k) not in ("room_entity", "cooling_entity")
+    }
+    result = await hass.config_entries.subentries.async_configure(result["flow_id"], values)
+    assert result["type"] is FlowResultType.ABORT
+    data = entry.subentries[WINDOW_ID].data
+    assert "room_entity" not in data
+    assert "cooling_entity" not in data

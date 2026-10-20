@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 MOVING = ("opening", "closing")
 INVALID = ("unavailable", "unknown")
 STATIONARY_TOLERANCE = 2
+# Without a sunrise (polar day or night) an override until sunrise ends after this time.
+NO_SUNRISE_FALLBACK = timedelta(hours=24)
 
 
 @dataclass
@@ -33,9 +35,6 @@ class CommandTracker:
 
     def register(self, cover: str, target: int | None, context_id: str | None, now: float) -> None:
         self._commands[cover] = _Command(target, context_id, now)
-
-    def pending(self, cover: str) -> bool:
-        return cover in self._commands
 
     def explains(
         self,
@@ -148,8 +147,9 @@ def _moved(start: _Start, state: str, position: float | None) -> bool:
 
 def override_until(
     now: datetime, duration_minutes: float, next_sunrise: datetime | None
-) -> datetime | None:
-    """End of an override started now. Duration 0 means until the next sunrise."""
+) -> datetime:
+    """End of an override started now. Duration 0 means until the next sunrise
+    (without a sunrise, e.g. in polar regions, after 24 hours)."""
     if duration_minutes > 0:
         return now + timedelta(minutes=duration_minutes)
-    return next_sunrise
+    return next_sunrise if next_sunrise is not None else now + NO_SUNRISE_FALLBACK
