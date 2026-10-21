@@ -45,6 +45,7 @@ from .const import (
     CONF_EVENING_EARLIEST,
     CONF_EVENING_ELEVATION,
     CONF_EVENING_LATEST,
+    CONF_EVENING_POSITION,
     CONF_FOLLOW_UP_CLOSE,
     CONF_FOLLOW_UP_EARLIEST,
     CONF_FORECAST_TYPE,
@@ -728,6 +729,7 @@ def window_evening_fields(values: dict[str, Any], options: dict[str, Any]) -> di
     """Evening run and own evening times (the global times are the defaults)."""
     return {
         _wreq(CONF_EVENING_CLOSE, values): BooleanSelector(),
+        _wreq(CONF_EVENING_POSITION, values): _number(0, 100, 1, "%"),
         _wreq(CONF_FOLLOW_UP_CLOSE, values): BooleanSelector(),
         _wreq(CONF_EVENING_CUSTOM, values): BooleanSelector(),
         **_evening_fields(values, {**DEFAULTS, **options}),

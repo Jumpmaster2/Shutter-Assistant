@@ -385,6 +385,7 @@
               "name": "Evening",
               "data": {
                 "evening_close": "Evening run",
+                "evening_position": "Evening position",
                 "follow_up_close": "Close after window closed",
                 "evening_custom": "Own evening times",
                 "evening_earliest": "Evening mode at the earliest",
@@ -393,6 +394,7 @@
               },
               "data_description": {
                 "evening_close": "Close at the start of the evening mode, once per evening and only with a closed window.",
+                "evening_position": "Target of the evening run and of closing after the window was closed. 0 % = closed; e.g. 20 % leaves a gap on warm nights.",
                 "follow_up_close": "If the window is closed in the evening, the cover closes (also during an override).",
                 "evening_custom": "Use the following values instead of the global ones.",
                 "evening_earliest": "The evening mode never starts before this time.",

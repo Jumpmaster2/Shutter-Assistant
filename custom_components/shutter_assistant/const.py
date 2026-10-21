@@ -187,6 +187,8 @@ CONF_WINDOW_EXCEPTION = "window_exception_entity"
 
 CONF_EVENING_CUSTOM = "evening_custom"
 CONF_EVENING_CLOSE = "evening_close"
+# Target of the evening run and of closing after the window was closed (0 = closed).
+CONF_EVENING_POSITION = "evening_position"
 CONF_FOLLOW_UP_CLOSE = "follow_up_close"
 CONF_VENTILATION = "ventilation"
 CONF_VENT_POSITION = "ventilation_position"
@@ -244,6 +246,7 @@ WINDOW_DEFAULTS: Final[dict[str, object]] = {
     CONF_TRIGGER_MAX_LOCK: 12,
     CONF_EVENING_CUSTOM: False,
     CONF_EVENING_CLOSE: True,
+    CONF_EVENING_POSITION: 0,
     CONF_FOLLOW_UP_CLOSE: True,
     CONF_VENTILATION: True,
     CONF_VENT_POSITION: 30,

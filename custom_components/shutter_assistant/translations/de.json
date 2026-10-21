@@ -385,6 +385,7 @@
               "name": "Abend",
               "data": {
                 "evening_close": "Abendlauf",
+                "evening_position": "Abendposition",
                 "follow_up_close": "Nachziehen",
                 "evening_custom": "Eigene Abendzeiten",
                 "evening_earliest": "Abendmodus frühestens",
@@ -393,6 +394,7 @@
               },
               "data_description": {
                 "evening_close": "Zu Beginn des Abendmodus schließen, einmal pro Abend und nur bei geschlossenem Fenster.",
+                "evening_position": "Ziel des Abendlaufs und des Nachziehens. 0 % = zu; z. B. 20 % lässt in warmen Nächten einen Spalt.",
                 "follow_up_close": "Wird das Fenster am Abend geschlossen, fährt das Rollo zu (auch bei Übersteuerung).",
                 "evening_custom": "Die folgenden Werte statt der globalen verwenden.",
                 "evening_earliest": "Vor dieser Uhrzeit beginnt der Abendmodus nie.",

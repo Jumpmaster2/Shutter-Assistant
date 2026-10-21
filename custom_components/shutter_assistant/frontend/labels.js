@@ -77,6 +77,10 @@ export const LABELS = {
    "Abendmodus spätestens",
    "Zeit-Fallback: spätestens um diese Uhrzeit beginnt der Abendmodus."
   ],
+  "evening_position": [
+   "Abendposition",
+   "Ziel des Abendlaufs und des Nachziehens. 0 % = zu; z. B. 20 % lässt in warmen Nächten einen Spalt."
+  ],
   "follow_up_close": [
    "Nachziehen",
    "Wird das Fenster am Abend geschlossen, fährt das Rollo zu (auch bei Übersteuerung)."
@@ -442,6 +446,10 @@ export const LABELS = {
   "evening_latest": [
    "Evening mode at the latest",
    "Time fallback: the evening mode starts at this time at the latest."
+  ],
+  "evening_position": [
+   "Evening position",
+   "Target of the evening run and of closing after the window was closed. 0 % = closed; e.g. 20 % leaves a gap on warm nights."
   ],
   "follow_up_close": [
    "Close after window closed",

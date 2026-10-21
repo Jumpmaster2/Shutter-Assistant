@@ -382,7 +382,7 @@ const WINDOW_CARDS = [
   {
     id: "w_evening",
     icon: "mdi:weather-night",
-    fields: (d) => ["evening_close", "follow_up_close", "evening_custom", ...(d.evening_custom ? ["evening_earliest", "evening_elevation", "evening_latest"] : [])],
+    fields: (d) => ["evening_close", "evening_position", "follow_up_close", "evening_custom", ...(d.evening_custom ? ["evening_earliest", "evening_elevation", "evening_latest"] : [])],
   },
   { id: "w_override", icon: "mdi:hand-back-right-outline", fields: () => ["override_duration", "override_sunrise_reset", "override_ignore_evening"] },
   {

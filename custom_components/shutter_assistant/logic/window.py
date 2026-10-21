@@ -66,6 +66,7 @@ class WindowRules:
     manual_at_sun_position: bool = False
     override_ignore_evening: bool = False
     evening_close: bool = True
+    evening_position: int = CLOSED
     follow_up_close: bool = True
     ventilation: bool = True
     ventilation_position: int = 30
@@ -200,8 +201,9 @@ def _override_blocks_evening(rules: WindowRules, s: Situation) -> bool:
 
 
 def evening(rules: WindowRules, s: Situation) -> list[Action]:
-    """Evening run: close once per evening if the window is closed and no override
-    (unless the window ignores overrides in the evening). Not during vacation."""
+    """Evening run: close (to the evening position) once per evening if the window
+    is closed and no override (unless the window ignores overrides in the evening).
+    Not during vacation."""
     if (
         not rules.evening_close
         or not s.active
@@ -212,13 +214,14 @@ def evening(rules: WindowRules, s: Situation) -> list[Action]:
         or _override_blocks_evening(rules, s)
     ):
         return []
-    return [_move(CLOSED, R_EVENING), Action(MARK_EVENING, R_EVENING)]
+    return [_move(rules.evening_position, R_EVENING), Action(MARK_EVENING, R_EVENING)]
 
 
 def follow_up(rules: WindowRules, s: Situation, after_earliest: bool) -> list[Action]:
-    """Window closed in the evening: close the cover (ignores overrides)."""
+    """Window closed in the evening: close the cover to the evening position
+    (ignores overrides)."""
     if rules.follow_up_close and s.active and s.evening and after_earliest:
-        return [_move(CLOSED, R_FOLLOW_UP), Action(MARK_EVENING, R_FOLLOW_UP)]
+        return [_move(rules.evening_position, R_FOLLOW_UP), Action(MARK_EVENING, R_FOLLOW_UP)]
     return []
 
 
@@ -261,8 +264,9 @@ def vacation_open(rules: WindowRules, s: Situation, position: int) -> list[Actio
 
 
 def vacation_close(rules: WindowRules, s: Situation) -> list[Action]:
-    """Vacation evening: mark as closed for the night and close if the window is
-    closed. Only the window sensor counts here (no exception entity)."""
+    """Vacation evening: mark as closed for the night and close (to the evening
+    position) if the window is closed. Only the window sensor counts here (no
+    exception entity)."""
     if (
         not s.active
         or s.position is None
@@ -271,8 +275,8 @@ def vacation_close(rules: WindowRules, s: Situation) -> list[Action]:
     ):
         return []
     actions = [Action(MARK_EVENING, R_VACATION_CLOSE)]
-    if s.position > CLOSED and not s.window_open:
-        actions.insert(0, _move(CLOSED, R_VACATION_CLOSE))
+    if s.position > rules.evening_position and not s.window_open:
+        actions.insert(0, _move(rules.evening_position, R_VACATION_CLOSE))
     return actions
 
 

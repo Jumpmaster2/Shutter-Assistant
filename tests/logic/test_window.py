@@ -175,6 +175,19 @@ def test_follow_up_closes_in_the_evening_regardless_of_override() -> None:
     assert w.follow_up(replace(RULES, follow_up_close=False), s, after_earliest=True) == []
 
 
+def test_evening_position_leaves_a_gap() -> None:
+    rules = replace(RULES, evening_position=20)
+    assert kinds(w.evening(rules, EVENING))[0] == (w.POSITION, w.R_EVENING, 20)
+    s = replace(EVENING, evening_marker=True)
+    assert kinds(w.follow_up(rules, s, after_earliest=True))[0] == (w.POSITION, w.R_FOLLOW_UP, 20)
+    vacation = Situation(position=100, vacation=True)
+    assert kinds(w.vacation_close(rules, vacation))[0] == (w.POSITION, w.R_VACATION_CLOSE, 20)
+    # already at or below the evening position: only marked
+    assert kinds(w.vacation_close(rules, replace(vacation, position=20))) == [
+        (w.MARK_EVENING, w.R_VACATION_CLOSE, None)
+    ]
+
+
 # ---------------------------------------------------------------- ventilation
 
 
