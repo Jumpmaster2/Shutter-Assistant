@@ -153,3 +153,15 @@ def override_until(
     if duration_minutes > 0:
         return now + timedelta(minutes=duration_minutes)
     return next_sunrise if next_sunrise is not None else now + NO_SUNRISE_FALLBACK
+
+
+def reached(target: int, position: int | None, state: str | None, tolerance: int = 3) -> bool:
+    """Did a cover reach the target of a command? Without a position only the end
+    positions can be checked (open or closed)."""
+    if position is not None:
+        return abs(position - target) <= tolerance
+    if target >= 100:
+        return state == "open"
+    if target <= 0:
+        return state == "closed"
+    return True

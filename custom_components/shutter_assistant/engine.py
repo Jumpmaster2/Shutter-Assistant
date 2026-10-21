@@ -53,6 +53,7 @@ from .const import (
     CONF_AZIMUTH_TO,
     CONF_CATCH_UP_AFTER,
     CONF_CLOSED_POSITION,
+    CONF_COMMAND_INTERVAL,
     CONF_COOLING_ENTITY,
     CONF_COVER,
     CONF_DAY_CHANGE,
@@ -134,6 +135,7 @@ from .const import (
     CONF_VENT_DELAY_EVENING,
     CONF_VENT_POSITION,
     CONF_VENTILATION,
+    CONF_VERIFY_AFTER,
     CONF_WEATHER,
     CONF_WEEKEND_DAYS,
     CONF_WIND_ENTITY,
@@ -144,6 +146,8 @@ from .const import (
     CONF_WINDOW_SENSORS,
     CONF_WORKDAY,
     DOMAIN,
+    EVENT_COVER_FAILED,
+    EVENT_COVER_MOVED,
     EVENT_LOGBOOK,
     EVENT_PROTECTION,
     GROUP_DEFAULTS,
@@ -177,7 +181,14 @@ from .logic.conditions import (
     window_contact,
 )
 from .logic.evening import EveningSettings, evening_day, evening_end, evening_start, is_evening
-from .logic.override import MOVING, CommandTracker, MovementWatch, is_manual, override_until
+from .logic.override import (
+    MOVING,
+    CommandTracker,
+    MovementWatch,
+    is_manual,
+    override_until,
+    reached,
+)
 from .logic.protection import FROST, KINDS, RAIN, WIND, Guard, above, freezing, raining
 from .logic.vacation import random_position, random_time
 from .messages import resolve_language, text
@@ -265,6 +276,10 @@ class Window:
     # switches of the window (persisted)
     automatic: bool = True
     sun_enabled: bool = True
+    # last command, checked after the verify time: target, reason, attempt
+    verify: tuple[int, str, int] | None = None
+    # the cover was still moving at the check: one more look later
+    verify_waited: bool = False
 
     @property
     def override_active(self) -> bool:
@@ -305,6 +320,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self._timer_due: dict[str, datetime] = {}
         self._evening_cache: dict[tuple[EveningSettings, date], tuple[datetime, datetime]] = {}
         self._rng = random.Random()
+        # cover -> (window id, target, reason, attempt), sent with the command spacing
+        self._queue: dict[str, tuple[str, int, str, int]] = {}
         self._outdoor_last: float | None = None
         release = float(self.opt(CONF_PROTECTION_RELEASE)) * 60
         self.guards: dict[str, Guard] = {kind: Guard(release) for kind in KINDS}
@@ -1080,10 +1097,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         reason = actions[0].reason
         position = moves[-1][0] if moves else None
         self._set_reason(win, reason, position, now)
-        for target, _reason in moves:
-            self._start_move(win, target)
+        for target, move_reason in moves:
+            self._start_move(win, target, move_reason)
         if notify:
-            self._create_task(self._async_notify(win), "notify")
+            self._notify_window_open(win)
         self._save()
         self.async_update_listeners()
 
@@ -1102,12 +1119,37 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             EVENT_LOGBOOK, {"name": win.name, "message": message, ATTR_ENTITY_ID: win.cover}
         )
 
-    def _start_move(self, win: Window, target: int) -> None:
+    def _start_move(self, win: Window, target: int, reason: str, attempt: int = 0) -> None:
+        """Queue a command; the queue keeps the spacing between commands."""
         state = self._state(win.cover)
         if state is None or state.state in INVALID:
             return
         if self._position(win) == target and state.state not in MOVING:
+            win.verify = None
             return
+        # only the latest command per cover counts
+        self._queue.pop(win.cover, None)
+        self._queue[win.cover] = (win.window_id, target, reason, attempt)
+        self._drain()
+
+    @callback
+    def _drain(self, _now: datetime | None = None) -> None:
+        """Send queued commands, one per command spacing (all at once without)."""
+        interval = float(self.opt(CONF_COMMAND_INTERVAL))
+        while self._queue and "queue" not in self._timers:
+            cover = next(iter(self._queue))
+            window_id, target, reason, attempt = self._queue.pop(cover)
+            win = self.windows.get(window_id)
+            if win is None or not self._send(win, target, reason, attempt):
+                continue
+            if interval > 0:
+                self._schedule("queue", dt_util.utcnow() + timedelta(seconds=interval), self._drain)
+
+    def _send(self, win: Window, target: int, reason: str, attempt: int) -> bool:
+        """Call the cover service. False if nothing was sent."""
+        state = self._state(win.cover)
+        if state is None or state.state in INVALID:
+            return False
         features = int(state.attributes.get(ATTR_SUPPORTED_FEATURES) or 0)
         data: dict[str, Any] = {ATTR_ENTITY_ID: win.cover}
         if target >= rules.OPEN:
@@ -1119,10 +1161,77 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             data["position"] = target
         else:
             LOGGER.warning("%s cannot move to %s %% (no position support)", win.cover, target)
-            return
+            return False
         context = Context()
         self.tracker.register(win.cover, target, context.id, self._now_ts)
         self._create_task(self._async_call("cover", service, data, context), "cover")
+        self.hass.bus.async_fire(
+            EVENT_COVER_MOVED,
+            {
+                "window": win.name,
+                "window_id": win.window_id,
+                ATTR_ENTITY_ID: win.cover,
+                "position": target,
+                "reason": reason,
+            },
+            context=context,
+        )
+        verify_after = float(self.opt(CONF_VERIFY_AFTER))
+        if verify_after > 0:
+            win.verify = (target, reason, attempt)
+            win.verify_waited = False
+            self._schedule(
+                f"{win.window_id}:verify",
+                dt_util.utcnow() + timedelta(seconds=verify_after),
+                lambda now, wid=win.window_id: self._on_verify(wid, now),
+            )
+        return True
+
+    @callback
+    def _on_verify(self, window_id: str, now: datetime) -> None:
+        """Repeat a command once if the cover did not reach its target, then report."""
+        win = self.windows.get(window_id)
+        if win is None or win.verify is None:
+            return
+        target, reason, attempt = win.verify
+        state = self._state(win.cover)
+        if state is not None and state.state in MOVING and not win.verify_waited:
+            # still moving: look once more later
+            win.verify_waited = True
+            self._schedule(
+                f"{win.window_id}:verify",
+                now + timedelta(seconds=float(self.opt(CONF_VERIFY_AFTER))),
+                lambda now, wid=window_id: self._on_verify(wid, now),
+            )
+            return
+        win.verify = None
+        current = self._position(win)
+        if reached(target, current, state.state if state else None):
+            return
+        if attempt == 0:
+            self._set_reason(win, "cover_retry", target, now)
+            self._start_move(win, target, reason, attempt=1)
+            return
+        self._set_reason(win, "cover_failed", target, now)
+        self.hass.bus.async_fire(
+            EVENT_COVER_FAILED,
+            {
+                "window": win.name,
+                "window_id": win.window_id,
+                ATTR_ENTITY_ID: win.cover,
+                "position": target,
+                "current_position": current,
+                "reason": reason,
+            },
+        )
+        self._create_task(
+            self._async_notify(
+                text(self.language, "notify_failed_title"),
+                text(self.language, "notify_cover_failed", name=win.name, position=target),
+            ),
+            "notify",
+        )
+        self.async_update_listeners()
 
     def _create_task(self, coro: Any, name: str) -> None:
         """Task bound to the config entry (waited for when the entry unloads)."""
@@ -1139,9 +1248,12 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         except (HomeAssistantError, ValueError) as err:
             LOGGER.warning("%s.%s failed: %s", domain, service, err)
 
-    async def _async_notify(self, win: Window) -> None:
+    def _notify_window_open(self, win: Window) -> None:
         title = text(self.language, "notify_title")
         message = text(self.language, "notify_window_open", name=win.name)
+        self._create_task(self._async_notify(title, message), "notify")
+
+    async def _async_notify(self, title: str, message: str) -> None:
         for target in self.opt(CONF_NOTIFY) or []:
             domain, _, service = str(target).partition(".")
             if not service:
@@ -1488,6 +1600,9 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         if not win.override_active:
             win.override_since = now
         win.last_manual = now
+        # moved by hand: the last command no longer needs to be checked
+        win.verify = None
+        self._cancel(f"{win.window_id}:verify")
         win.override_until = override_until(now, duration, self._next_sunrise)
         win.override_sunrise = bool(win.conf[CONF_OVERRIDE_SUNRISE]) or duration <= 0
         until = (
@@ -2005,6 +2120,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             "evening": self.global_evening_active,
             "vacation": self.vacation,
             "startup_until": _iso(self.startup_until),
+            "protection": {
+                kind: {"active": guard.active, "release_due": guard.release_due}
+                for kind, guard in self.guards.items()
+            },
+            "queued_commands": len(self._queue),
             "groups": {gid: g.name for gid, g in self.groups.items()},
             "windows": {
                 wid: {
@@ -2012,6 +2132,9 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     "situation": self._situation(win, now).__dict__,
                     "last_reason": win.last_reason,
                     "override_until": _iso(win.override_until),
+                    "automatic": win.automatic,
+                    "sun_enabled": win.sun_enabled,
+                    "verify": win.verify,
                     "timers": sorted(k for k in self._timers if k.startswith(wid)),
                 }
                 for wid, win in self.windows.items()
