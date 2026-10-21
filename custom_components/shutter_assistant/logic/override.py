@@ -155,7 +155,7 @@ def override_until(
     return next_sunrise if next_sunrise is not None else now + NO_SUNRISE_FALLBACK
 
 
-def reached(target: int, position: int | None, state: str | None, tolerance: int = 3) -> bool:
+def reached(target: int, position: int | None, state: str | None, tolerance: int = 5) -> bool:
     """Did a cover reach the target of a command? Without a position only the end
     positions can be checked (open or closed)."""
     if position is not None:
