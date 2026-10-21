@@ -3,15 +3,26 @@
 from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_SHOW_PANEL, DEFAULTS, DOMAIN, PLATFORMS, STORAGE_VERSION
 from .engine import ShutterConfigEntry, ShutterEngine
 from .entity import global_device_info
 from .panel import async_register_panel, async_unregister_panel
+from .services import async_register_services
 from .websocket import async_register_websocket
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the services (they work on the loaded entry)."""
+    async_register_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ShutterConfigEntry) -> bool:

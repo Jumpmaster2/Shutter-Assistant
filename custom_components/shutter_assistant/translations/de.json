@@ -605,6 +605,16 @@
         "twice_daily": "Zweimal täglich",
         "hourly": "Stündlich"
       }
+    },
+    "service_action": {
+      "options": {
+        "open": "Öffnen",
+        "close": "Schließen",
+        "evening": "Abendposition",
+        "sun_protection": "Sonnenschutz-Position",
+        "ventilation": "Lüftungsposition",
+        "position": "Position"
+      }
     }
   },
   "entity": {
@@ -694,6 +704,71 @@
     "forecast_unsupported": {
       "title": "Wetter-Entität liefert keine Vorhersage",
       "description": "{weather} unterstützt keine der Vorhersage-Arten täglich, zweimal täglich oder stündlich. Der Sommertag beginnt dann nur über die Außentemperatur. Bitte in den Einstellungen von Shutter Assistant eine andere Wetter-Entität wählen."
+    }
+  },
+  "services": {
+    "move": {
+      "name": "Fahren",
+      "description": "Fährt Fenster von Shutter Assistant, ohne eine Übersteuerung zu starten. Frost- und Aussperrschutz gelten weiter.",
+      "fields": {
+        "entity_id": {
+          "name": "Rollos",
+          "description": "Rollos konfigurierter Fenster. Leer = alle Fenster."
+        },
+        "action": {
+          "name": "Aktion",
+          "description": "Abend und Sonnenschutz nutzen die Positionen des Fensters und werden vorgemerkt wie die Fahrten der Automatik."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Nur für die Aktion „Position“ (100 % = offen)."
+        }
+      }
+    },
+    "start_override": {
+      "name": "Übersteuerung starten",
+      "description": "Pausiert die Automatik von Fenstern wie eine Fahrt von Hand.",
+      "fields": {
+        "entity_id": {
+          "name": "Rollos",
+          "description": "Rollos konfigurierter Fenster. Leer = alle Fenster."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Leer = die Dauer des Fensters. 0 = bis Sonnenaufgang."
+        }
+      }
+    },
+    "end_override": {
+      "name": "Übersteuerung beenden",
+      "description": "Beendet eine laufende Übersteuerung; die Automatik entscheidet beim nächsten Anlass.",
+      "fields": {
+        "entity_id": {
+          "name": "Rollos",
+          "description": "Rollos konfigurierter Fenster. Leer = alle Fenster."
+        }
+      }
+    },
+    "resume": {
+      "name": "Automatik fortsetzen",
+      "description": "Beendet eine Übersteuerung und lässt die Automatik sofort entscheiden (Sonnenschutz, Abendlauf).",
+      "fields": {
+        "entity_id": {
+          "name": "Rollos",
+          "description": "Rollos konfigurierter Fenster. Leer = alle Fenster."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Shutter Assistant ist nicht geladen."
+    },
+    "unknown_cover": {
+      "message": "{entity_id} gehört zu keinem Fenster von Shutter Assistant."
+    },
+    "position_required": {
+      "message": "Die Aktion „Position“ braucht eine Position."
     }
   }
 }

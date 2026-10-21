@@ -872,6 +872,14 @@ export const CHOICES = {
    "movement": "Nur wenn das Rollo wirklich fährt",
    "command": "Bei jedem Befehl von Hand, auch ohne Fahrt"
   },
+  "service_action": {
+   "open": "Öffnen",
+   "close": "Schließen",
+   "evening": "Abendposition",
+   "sun_protection": "Sonnenschutz-Position",
+   "ventilation": "Lüftungsposition",
+   "position": "Position"
+  },
   "weekday": {
    "mon": "Montag",
    "tue": "Dienstag",
@@ -907,6 +915,14 @@ export const CHOICES = {
   "override_trigger": {
    "movement": "Only when the cover really moves",
    "command": "With every command by hand, also without movement"
+  },
+  "service_action": {
+   "open": "Open",
+   "close": "Close",
+   "evening": "Evening position",
+   "sun_protection": "Sun protection position",
+   "ventilation": "Ventilation position",
+   "position": "Position"
   },
   "weekday": {
    "mon": "Monday",

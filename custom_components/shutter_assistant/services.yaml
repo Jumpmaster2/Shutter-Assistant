@@ -1,0 +1,58 @@
+move:
+  fields:
+    entity_id:
+      selector:
+        entity:
+          domain: cover
+          multiple: true
+    action:
+      required: true
+      example: evening
+      selector:
+        select:
+          translation_key: service_action
+          options:
+            - open
+            - close
+            - evening
+            - sun_protection
+            - ventilation
+            - position
+    position:
+      example: 40
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+
+start_override:
+  fields:
+    entity_id:
+      selector:
+        entity:
+          domain: cover
+          multiple: true
+    duration:
+      example: 120
+      selector:
+        number:
+          min: 0
+          max: 1440
+          unit_of_measurement: min
+
+end_override:
+  fields:
+    entity_id:
+      selector:
+        entity:
+          domain: cover
+          multiple: true
+
+resume:
+  fields:
+    entity_id:
+      selector:
+        entity:
+          domain: cover
+          multiple: true

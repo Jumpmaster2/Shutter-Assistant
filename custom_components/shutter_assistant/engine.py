@@ -1595,8 +1595,9 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 self._evaluate(win, now)
         self.async_update_listeners()
 
-    def _start_override(self, win: Window, now: datetime) -> None:
-        duration = float(win.conf[CONF_OVERRIDE_DURATION])
+    def _start_override(self, win: Window, now: datetime, duration: float | None = None) -> None:
+        if duration is None:
+            duration = float(win.conf[CONF_OVERRIDE_DURATION])
         if not win.override_active:
             win.override_since = now
         win.last_manual = now
@@ -1647,6 +1648,94 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self._refresh(win, now)
         self._evaluate(win, now)
         self.async_update_listeners()
+
+    # ------------------------------------------------------------------ switches, services
+
+    @callback
+    def set_window_switch(self, window_id: str, key: str, on: bool) -> None:
+        """Automatic or sun protection of one window (kept over restarts)."""
+        win = self.windows[window_id]
+        setattr(win, key, on)
+        self._save()
+        if on:
+            now = dt_util.now()
+            self._refresh(win, now)
+            self._evaluate(win, now)
+        self.async_update_listeners()
+
+    def window_by_cover(self, cover: str) -> Window | None:
+        return next((win for win in self.windows.values() if win.cover == cover), None)
+
+    @callback
+    def service_move(self, window_id: str, action: str, position: int | None = None) -> None:
+        """Move a window by service (no override; frost and the lockout still apply)."""
+        win = self.windows[window_id]
+        now = dt_util.now()
+        targets = {
+            "open": rules.OPEN,
+            "close": rules.CLOSED,
+            "evening": win.rules.evening_position,
+            "sun_protection": win.rules.sun_position,
+            "ventilation": win.rules.ventilation_position,
+        }
+        target = position if action == "position" else targets[action]
+        if target is None:
+            return
+        actions = [rules.Action(rules.POSITION, "service", int(target))]
+        # remembered like the automatic would: no second evening run, auto up later
+        if action == "evening":
+            actions.append(rules.Action(rules.MARK_EVENING, "service"))
+        elif action == "sun_protection":
+            actions.append(rules.Action(rules.MARK_SUN, "service"))
+        self._apply(win, actions, now)
+
+    @callback
+    def start_override(self, window_id: str, duration: float | None = None) -> None:
+        """Start an override by service, with its own duration (minutes) if given."""
+        win = self.windows[window_id]
+        self._start_override(win, dt_util.now(), duration)
+        self.async_update_listeners()
+
+    @callback
+    def resume(self, window_id: str) -> None:
+        """End an override and let the rules decide right away."""
+        win = self.windows[window_id]
+        now = dt_util.now()
+        if win.override_active:
+            self._end_override(window_id, now)
+        self._set_reason(win, "resume", None, now)
+        self._refresh(win, now)
+        if self._evening(win, now):
+            self._run_evening(win, now)
+        self._evaluate(win, now)
+        self.async_update_listeners()
+
+    def next_action(self, win: Window) -> tuple[datetime, str] | None:
+        """The next planned point in time that may move the window."""
+        now = dt_util.now()
+        found: list[tuple[datetime, str]] = []
+
+        def due(key: str, action: str) -> None:
+            if (when := self._timer_due.get(key)) is not None and when > now:
+                found.append((when, action))
+
+        release = self.guards[win.protection].due() if win.protection else None
+        if release is not None:
+            found.append((dt_util.utc_from_timestamp(release), "protection_end"))
+        if win.override_active and win.override_until is not None:
+            found.append((win.override_until, "override_end"))
+        if win.rules.evening_close:
+            due(f"{win.window_id}:evening", "evening")
+        due(f"{win.window_id}:morning", "morning")
+        if win.group_id:
+            if self.sun_marker(win) and win.rules.auto_up and self.in_sector(win):
+                due(f"sector:{win.group_id}", "sun_leave")
+            elif self.summer and win.sun_enabled and not self.in_sector(win):
+                due(f"sector:{win.group_id}", "sun_enter")
+        if not found:
+            return None
+        when, action = min(found, key=lambda item: item[0])
+        return dt_util.as_local(when), action
 
     @callback
     def end_override(self, window_id: str) -> bool:

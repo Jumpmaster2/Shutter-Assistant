@@ -605,6 +605,16 @@
         "twice_daily": "Twice daily",
         "hourly": "Hourly"
       }
+    },
+    "service_action": {
+      "options": {
+        "open": "Open",
+        "close": "Close",
+        "evening": "Evening position",
+        "sun_protection": "Sun protection position",
+        "ventilation": "Ventilation position",
+        "position": "Position"
+      }
     }
   },
   "entity": {
@@ -694,6 +704,71 @@
     "forecast_unsupported": {
       "title": "Weather entity provides no forecast",
       "description": "{weather} supports none of the forecast kinds daily, twice daily or hourly. The summer day then only starts by the outdoor temperature. Choose another weather entity in the settings of Shutter Assistant."
+    }
+  },
+  "services": {
+    "move": {
+      "name": "Move",
+      "description": "Moves windows of Shutter Assistant without starting an override. Frost and the lockout protection still apply.",
+      "fields": {
+        "entity_id": {
+          "name": "Covers",
+          "description": "Covers of configured windows. Empty = all windows."
+        },
+        "action": {
+          "name": "Action",
+          "description": "Evening and sun protection use the positions of the window and are remembered like the automatic's own runs."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Only for the action \"Position\" (100 % = open)."
+        }
+      }
+    },
+    "start_override": {
+      "name": "Start override",
+      "description": "Pauses the automatic of windows like a manual movement.",
+      "fields": {
+        "entity_id": {
+          "name": "Covers",
+          "description": "Covers of configured windows. Empty = all windows."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Empty = the duration of the window. 0 = until sunrise."
+        }
+      }
+    },
+    "end_override": {
+      "name": "End override",
+      "description": "Ends a running override; the automatic decides at its next occasion.",
+      "fields": {
+        "entity_id": {
+          "name": "Covers",
+          "description": "Covers of configured windows. Empty = all windows."
+        }
+      }
+    },
+    "resume": {
+      "name": "Resume automatic",
+      "description": "Ends an override and lets the automatic decide right away (sun protection, evening run).",
+      "fields": {
+        "entity_id": {
+          "name": "Covers",
+          "description": "Covers of configured windows. Empty = all windows."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Shutter Assistant is not loaded."
+    },
+    "unknown_cover": {
+      "message": "{entity_id} does not belong to a window of Shutter Assistant."
+    },
+    "position_required": {
+      "message": "The action \"Position\" needs a position."
     }
   }
 }
