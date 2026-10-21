@@ -217,6 +217,29 @@ windows: [Living room]   # optional: names or ids, default all
 compass: true            # optional: show the sun compass
 ```
 
+### Small tiles for the sections dashboard
+
+**Shutter Assistant tile** (3 × 1): one cover or one window contact. The cover comes down as slats from the top of the tile, next to it the position. An open or tilted window colors the tile. A tap opens the more info dialog.
+
+```yaml
+type: custom:shutter-assistant-tile
+entity: cover.living_room  # cover, binary_sensor (on = open) or window handle (open/tilted/closed)
+name: Living room          # optional
+icon: mdi:blinds           # optional
+```
+
+**Shutter Assistant window tile** (6 × 1): cover and window together, name and position at the top, the window state below.
+
+```yaml
+type: custom:shutter-assistant-window-tile
+window: Living room        # window of Shutter Assistant (name or id), or yourself:
+cover: cover.living_room
+contact: binary_sensor.living_room_window
+tilt: binary_sensor.living_room_window_tilted   # optional, on = tilted
+```
+
+Colors (both tiles, optional): `color_cover`, `color_closed`, `color_open` and `color_tilted`, each a color name of the theme (`purple`, `orange`, `teal`, ...) or a CSS color (`"#00897b"`). Everything can also be set in the card editor.
+
 ## Own dashboard cards
 
 The attributes of the entities can be used in own cards, for example:

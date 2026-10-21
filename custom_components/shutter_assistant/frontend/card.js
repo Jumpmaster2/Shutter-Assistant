@@ -9,6 +9,7 @@
 //   compass: true          # optional: show the sun compass
 
 import { NEXT_ACTION, STATUS } from "./labels.js";
+import "./tiles.js";
 
 const UI = {
   de: {
