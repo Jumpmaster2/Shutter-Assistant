@@ -26,6 +26,7 @@ from .config_flow import (
     _notify_services,
     _number,
     _override_schema,
+    _protection_schema,
     _startup_schema,
     _summer_schema,
     _time_key,
@@ -42,16 +43,20 @@ from .config_flow import (
     window_morning_fields,
     window_morning_mode_fields,
     window_override_fields,
+    window_protection_fields,
     window_sun_fields,
     window_ventilation_fields,
 )
 from .const import (
+    CONF_AZIMUTH_FROM,
+    CONF_AZIMUTH_TO,
     CONF_COOLING_ENTITY,
     CONF_COVER,
     CONF_EVENING_CUSTOM,
     CONF_EVENING_EARLIEST,
     CONF_EVENING_ELEVATION,
     CONF_EVENING_LATEST,
+    CONF_FROST_POSITION,
     CONF_GROUP,
     CONF_HEATING_ENTITY,
     CONF_HOUSE_AZIMUTH,
@@ -63,10 +68,14 @@ from .const import (
     CONF_NAME,
     CONF_OPEN_BLOCK,
     CONF_OUTDOOR_TEMP,
+    CONF_RAIN_ENTITY,
+    CONF_RAIN_POSITION,
     CONF_ROOM_ENTITY,
     CONF_WALL,
     CONF_WALL_POSITION,
     CONF_WEATHER,
+    CONF_WIND_ENTITY,
+    CONF_WIND_POSITION,
     CONF_WINDOW_EXCEPTION,
     CONF_WORKDAY,
     DEFAULTS,
@@ -89,6 +98,9 @@ GLOBAL_ENTITIES = {
     "summer_day": "binary_sensor",
     "evening_mode": "binary_sensor",
     "forecast_max": "sensor",
+    "wind_protection": "binary_sensor",
+    "rain_protection": "binary_sensor",
+    "frost_protection": "binary_sensor",
 }
 WINDOW_ENTITIES = {
     "status": "sensor",
@@ -97,6 +109,9 @@ WINDOW_ENTITIES = {
     "sun_condition": "binary_sensor",
     "sun_protection_today": "binary_sensor",
     "evening_closed": "binary_sensor",
+    "next_action": "sensor",
+    "window_automatic": "switch",
+    "window_sun_protection": "switch",
 }
 
 # Settings only the panel has: the house in the sun compass (shown when all
@@ -122,6 +137,8 @@ OPTION_KEYS = {
     CONF_WEATHER,
     CONF_WORKDAY,
     CONF_HEATING_ENTITY,
+    CONF_WIND_ENTITY,
+    CONF_RAIN_ENTITY,
     CONF_HOUSE_AZIMUTH,
     CONF_HOUSE_WIDTH,
     CONF_HOUSE_DEPTH,
@@ -141,6 +158,9 @@ WINDOW_KEYS = {
     CONF_EVENING_LATEST,
     CONF_WALL,
     CONF_WALL_POSITION,
+    CONF_WIND_POSITION,
+    CONF_RAIN_POSITION,
+    CONF_FROST_POSITION,
 }
 GROUP_KEYS = {*GROUP_DEFAULTS, CONF_NAME, CONF_WALL}
 
@@ -155,6 +175,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_save_subentry)
     websocket_api.async_register_command(hass, ws_delete_subentry)
     websocket_api.async_register_command(hass, ws_end_override)
+    websocket_api.async_register_command(hass, ws_card)
 
 
 def _entry(hass: HomeAssistant) -> ConfigEntry | None:
@@ -208,6 +229,7 @@ def _option_fields(hass: HomeAssistant, values: dict[str, Any]) -> dict[Any, Any
         _summer_schema(values, temperature_unit(hass)),
         _evening_schema(values),
         _vacation_schema(values),
+        _protection_schema(values, temperature_unit(hass)),
         _startup_schema(values),
         _advanced_schema(values),
     ):
@@ -238,6 +260,7 @@ def _window_fields(
         window_conditions_fields(values),
         window_evening_fields(values, options),
         window_ventilation_fields(values),
+        window_protection_fields(values),
         window_morning_fields(values),
     ):
         fields.update(build)
@@ -488,3 +511,56 @@ def ws_end_override(
         connection.send_error(msg["id"], "not_found", "window not found")
         return
     connection.send_result(msg["id"], {"ended": engine.end_override(msg["window_id"])})
+
+
+def card_payload(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
+    """What the dashboard card shows: windows and groups with their entities.
+
+    Read only and without settings; the live values come from the states.
+    """
+    registry = er.async_get(hass)
+
+    def entity_ids(prefix: str, keys: dict[str, str]) -> dict[str, str]:
+        found = {}
+        for key, domain in keys.items():
+            if entity_id := registry.async_get_entity_id(domain, DOMAIN, f"{prefix}_{key}"):
+                found[key] = entity_id
+        return found
+
+    language = entry.runtime_data.language if entry.state is ConfigEntryState.LOADED else None
+    return {
+        "loaded": entry.state is ConfigEntryState.LOADED,
+        "language": language,
+        "entities": entity_ids(entry.entry_id, GLOBAL_ENTITIES),
+        "groups": [
+            {
+                "id": sub_id,
+                "name": sub.title,
+                "azimuth_from": {**GROUP_DEFAULTS, **sub.data}[CONF_AZIMUTH_FROM],
+                "azimuth_to": {**GROUP_DEFAULTS, **sub.data}[CONF_AZIMUTH_TO],
+            }
+            for sub_id, sub in _groups(entry).items()
+        ],
+        "windows": [
+            {
+                "id": sub_id,
+                "name": sub.title,
+                "cover": sub.data.get(CONF_COVER),
+                "group": sub.data.get(CONF_GROUP),
+                "entities": entity_ids(sub_id, WINDOW_ENTITIES),
+            }
+            for sub_id, sub in entry.subentries.items()
+            if sub.subentry_type == SUBENTRY_WINDOW
+        ],
+    }
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/card"})
+@callback
+def ws_card(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """For every user: the card only shows and operates, it changes no settings."""
+    entry = _entry(hass)
+    if entry is None:
+        connection.send_error(msg["id"], "not_found", "Shutter Assistant is not set up")
+        return
+    connection.send_result(msg["id"], card_payload(hass, entry))

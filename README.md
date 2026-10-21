@@ -2,11 +2,11 @@
 
 [English version](README.en.md)
 
-Custom Integration für Home Assistant, die Rollos und Raffstores automatisch steuert (die Behanghöhe; Lamellen werden nicht gewendet): Sonnenschutz nach Himmelsrichtung, Abendmodus, Lüftungsposition, manuelle Übersteuerung, Morgenöffnung und Urlaubssimulation. Alles wird in der Oberfläche eingestellt, nichts ist fest im Code. Es gibt keine KI und kein Lernen, die Regeln sind nachvollziehbar und jede Fahrt steht mit Grund im Logbuch.
+Custom Integration für Home Assistant, die Rollos und Raffstores automatisch steuert (die Behanghöhe; Lamellen werden nicht gewendet): Sonnenschutz nach Himmelsrichtung, Abendmodus, Lüftungsposition, Wetterschutz (Wind, Regen, Frost), manuelle Übersteuerung, Morgenöffnung und Urlaubssimulation. Alles wird in der Oberfläche eingestellt, nichts ist fest im Code. Es gibt keine KI und kein Lernen, die Regeln sind nachvollziehbar und jede Fahrt steht mit Grund im Logbuch.
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.4.0.
+> Status: Version 0.5.0.
 
 ## Funktionsweise
 
@@ -30,8 +30,27 @@ Die Integration arbeitet ereignisgesteuert: Sie reagiert nur auf Zustandswechsel
 
 * **Abendmodus:** beginnt, wenn die Sonne unter die eingestellte Höhe sinkt (Standard -4 °), frühestens um 17:00 und spätestens um 21:00. Er endet um 03:30 oder bei Sonnenaufgang. Werte global oder pro Fenster.
 * **Abendlauf:** zu Beginn des Abendmodus schließt jedes Rollo einmal, wenn das Fenster zu ist und keine Übersteuerung aktiv ist (pro Fenster einstellbar: trotz Übersteuerung schließen, z. B. Schlafräume).
+* **Abendposition:** pro Fenster das Ziel von Abendlauf, Nachziehen und Urlaub abends. Standard 0 % = zu; z. B. 20 % lässt in warmen Nächten einen Spalt.
 * **Nachziehen:** wird am Abend ein Fenster geschlossen, fährt das Rollo zu (ab 16:00, auch bei Übersteuerung).
 * **Lüftungsposition:** wird ein Fenster geöffnet und das Rollo ist (fast) zu, fährt es auf die Lüftungsposition (Standard 30 %). Abends nach 3 s, tagsüber nach 60 s, wenn das Fenster dann noch offen ist.
+
+### Fensterkontakte, gekippt und Tür
+
+* **Offen, gekippt, zu:** Fensterkontakte melden „an“ = offen. Fenstergriffe mit den Zuständen `open`, `tilted` und `closed` gehen ebenfalls, zusätzlich gibt es **Kipp-Kontakte** („an“ = gekippt). Unbekannt oder nicht verfügbar zählt als offen (bei Kipp-Kontakten als gekippt).
+* **Gekippt:** ein nur gekipptes Fenster verhindert keine Schließfahrt mehr, das Rollo fährt aber höchstens bis zur Lüftungsposition. Wird ein Fenster gekippt, gibt es wie beim Öffnen die Lüftungsposition. Ganz offen verhindert Schließfahrten wie bisher.
+* **Aussperrschutz (Tür):** solange der Kontakt offen meldet, fährt nichts unter die Lüftungsposition, auch nicht mit Fenster-Ausnahme, Nachziehen oder Wetterschutz.
+
+### Wetterschutz
+
+* **Wind und Regen:** global ein Windsensor mit Schwelle (in der Einheit des Sensors) und ein Regensensor (an/aus oder eine Menge über einer Schwelle). Pro Fenster eine **Position bei Wind** und **bei Regen**, leer = nicht betroffen (z. B. Raffstores bei Wind auf 100 %, ein Dachfenster bei Regen auf 0 %). Der Schutz beginnt sofort und fährt die betroffenen Rollos auf ihre Position, **auch bei Übersteuerung und ausgeschalteter Automatik** (nicht im Neustart-Schutz, danach nachgeholt). Wind geht vor Regen. Ein offenes Fenster verhindert nur Schließfahrten; sie werden nachgeholt, sobald es zu ist.
+* **Solange der Schutz läuft,** ruhen alle anderen Regeln für das Fenster (Status „Wetterschutz“). Er endet erst, wenn der Wert die **Freigabezeit** (Standard 15 min) lang wieder im sicheren Bereich war. Ein nicht verfügbarer Sensor beendet nie einen Schutz. Danach entscheidet die Automatik neu (Sonnenschutz, Abendlauf); die alte Position wird nicht wiederhergestellt.
+* **Frost:** Fenster mit einer **tiefsten Position bei Frost** (z. B. 5 %) schließen bei einer Außentemperatur bis zur Frostschwelle (Standard 1 °C) nur bis dorthin, damit das Rollo nicht anfriert. Das gilt für alle automatischen Fahrten und Services, nicht für den Wind- und Regenschutz.
+* Ein- und Ende stehen im Logbuch, dazu das Ereignis `shutter_assistant_protection` mit `kind` (wind, rain, frost) und `active`.
+
+### Zuverlässigkeit
+
+* **Abstand zwischen Fahrbefehlen** (Erweitert, Standard 0 = alle gleichzeitig): mehrere Rollos fahren nacheinander, z. B. alle 2 s, gegen Funkkollisionen.
+* **Position prüfen** (Erweitert, Standard nach 90 s): hat ein Rollo sein Ziel bis dahin nicht erreicht (± 5 %), wird der Befehl einmal wiederholt. Klappt das auch nicht, gibt es eine Benachrichtigung, einen Logbuch-Eintrag und das Ereignis `shutter_assistant_cover_failed`. Fährt das Rollo bei der Prüfung noch, wird einmal später nachgesehen. Eine Bewegung von Hand beendet die Prüfung.
 
 ### Übersteuerung
 
@@ -55,7 +74,7 @@ Solange eine der Urlaubs-Entitäten an ist (z. B. ein input_boolean „Urlaub“
 
 ### Neustart-Schutz
 
-Nach dem Start von Home Assistant gibt es einige Minuten (Standard 5) keine Fahrten. Danach wird ausgewertet und der Abendlauf für noch nicht geschlossene Fenster nachgeholt (nur ab 12:00). Übersteuerungen, Tagesmarker und der Automatik-Schalter bleiben über Neustarts erhalten.
+Nach dem Start von Home Assistant gibt es einige Minuten (Standard 5) keine Fahrten. Danach wird ausgewertet und der Abendlauf für noch nicht geschlossene Fenster nachgeholt (nur ab 12:00). Übersteuerungen, Tagesmarker, ein laufender Wetterschutz und die Automatik-Schalter bleiben über Neustarts erhalten.
 
 ## Installation über HACS
 
@@ -82,8 +101,8 @@ Alle Temperaturen (Schwellen, Vorhersage, Raum) gelten in der Einheit des Einhei
 
 Nach der Einrichtung gibt es in der Seitenleiste die Seite **Shutter Assistant** (nur für Administratoren). **Einstellungen** bei der Integration (Geräte & Dienste) öffnet direkt diese Seite.
 
-* **Übersicht:** Automatik an/aus, Sommertag (Vorhersage und Schwelle), Beginn des Abendmodus, Urlaub und Neustart-Schutz. Dazu der **Sonnenkompass** mit dem aktuellen Sonnenstand und den Bereichen der Gruppen, Hinweise (z. B. eingestellte Entitäten, die es nicht gibt, oder eine gelöschte Gruppe) und alle Fenster mit Status, Position, Fensterkontakt und letztem Grund. Eine laufende Übersteuerung lässt sich direkt **beenden**. Der **Sonnenbedingung-Check** zeigt je Fenster jede Teilbedingung mit aktuellem Wert und Schwelle: Sommertag (mit Nacht-Tiefstwert, wenn die Außentemperatur ihn ausgelöst hat), Außentemperatur, jeder Sonnensensor, Raum, Klimaanlage, Heizbedarf, Haltezeit (mit Uhrzeit, ab wann sie erfüllt ist) und ob die Sonne im Bereich steht.
-* **Fenster:** alle Fenster als Tabelle, anklicken zum Bearbeiten. Der Editor zeigt die Einstellungen nach Themen in Karten (Fenster, Sonnenschutz, Manuellen Sonnenschutz erkennen, Abend, Übersteuerung, Lüften & Urlaub, Morgenöffnung, Zusatzbedingungen). Es erscheinen nur die Felder, die gerade gelten: Schwellen nur für die Sensortypen der Gruppe, eigene Abendzeiten nur wenn eingeschaltet, bei der Morgenöffnung nur die Felder des gewählten Modus. **Duplizieren** legt ein neues Fenster mit denselben Einstellungen an, nur Rollo und Fensterkontakte werden neu gewählt.
+* **Übersicht:** Automatik an/aus, Sommertag (Vorhersage und Schwelle), Beginn des Abendmodus, Urlaub, Wetterschutz und Neustart-Schutz. Dazu der **Sonnenkompass** mit dem aktuellen Sonnenstand und den Bereichen der Gruppen, Hinweise (z. B. eingestellte Entitäten, die es nicht gibt, oder eine gelöschte Gruppe) und alle Fenster mit Status, Position, Fensterkontakt (offen, gekippt, zu), nächster Aktion und letztem Grund. Eine laufende Übersteuerung lässt sich direkt **beenden**. Der **Sonnenbedingung-Check** zeigt je Fenster jede Teilbedingung mit aktuellem Wert und Schwelle: Sommertag (mit Nacht-Tiefstwert, wenn die Außentemperatur ihn ausgelöst hat), Außentemperatur, jeder Sonnensensor, Raum, Klimaanlage, Heizbedarf, Haltezeit (mit Uhrzeit, ab wann sie erfüllt ist) und ob die Sonne im Bereich steht.
+* **Fenster:** alle Fenster als Tabelle, anklicken zum Bearbeiten. Der Editor zeigt die Einstellungen nach Themen in Karten (Fenster, Sonnenschutz, Manuellen Sonnenschutz erkennen, Abend, Übersteuerung, Lüften & Urlaub, Morgenöffnung, Zusatzbedingungen, Wetterschutz & Tür). Es erscheinen nur die Felder, die gerade gelten: Schwellen nur für die Sensortypen der Gruppe, eigene Abendzeiten nur wenn eingeschaltet, bei der Morgenöffnung nur die Felder des gewählten Modus. **Duplizieren** legt ein neues Fenster mit denselben Einstellungen an, nur Rollo und Fensterkontakte werden neu gewählt.
 * **Gruppen:** Himmelsrichtungen mit den aktuellen Werten ihrer Sensoren und den Fenstern, die sie verwenden. Beim Bearbeiten zeigt der Kompass den Bereich der Gruppe sofort an.
 * **Haus im Kompass** (unter **Allgemein**): Länge der Vorderseite, Tiefe und die Richtung, in die die Vorderseite zeigt. Sind alle drei Werte eingetragen, erscheint das Haus maßstabsgetreu gedreht in der Mitte des Kompasses. Einer Gruppe lässt sich dann eine **Wand** zuordnen: der Azimut-Bereich wird auf die Ausrichtung der Wand ± 90° gesetzt (danach frei änderbar) und die Wand erscheint in der Farbe der Gruppe. **Fenster** erscheinen als Markierung an ihrer Wand (eigene Wand oder die der Gruppe), live eingefärbt nach Sonnenschutz, Übersteuerung und Abend, hohl bei offenem Fenster; ein Klick öffnet das Fenster. Mit **Position an der Wand** (1, 2, 3 …) lässt sich die Reihenfolge der Fenster einer Wand festlegen: 1 ist ganz links, von innen durch die Wand nach draußen geschaut; Fenster ohne Zahl kommen danach.
 * **Allgemein** und **Abend & Urlaub:** die globalen Einstellungen in Karten, jede Karte wird für sich gespeichert.
@@ -113,9 +132,15 @@ Die Werte werden genauso geprüft wie in den Dialogen (gleiche Bereiche, Einheit
 | Öffnungsposition von, bis | 60 %, 100 % | |
 | Urlaub abends ab, Zufallszeitraum | 19:00, 90 min | |
 | Übersteuerung beginnt | nur bei echter Fahrt | oder bei jedem Befehl von Hand, auch ohne Fahrt |
+| Windsensor, Windschutz ab | , 50 | Einheit des Sensors (z. B. km/h) |
+| Regensensor, Regenschutz über | , 0 | an/aus oder eine Menge (z. B. mm/h) |
+| Frost ab (höchstens) | 1 °C | Außentemperatur, nur für Fenster mit Frostposition |
+| Freigabe nach | 15 min | Wetterschutz endet erst nach dieser Zeit im sicheren Bereich |
 | Neustart-Schutz | 5 min | |
 | Abendlauf nachholen ab | 12:00 | |
 | Fenster gilt als geschlossen nach (Erweitert) | 5 s | Entprellung der Fensterkontakte |
+| Abstand zwischen Fahrbefehlen (Erweitert) | 0 s | 0 = alle gleichzeitig |
+| Position prüfen nach (Erweitert) | 90 s | einmal wiederholen, dann melden; 0 = aus |
 | Dashboard in der Seitenleiste (Erweitert) | an | aus: nur noch über „Einstellungen“ bei der Integration erreichbar |
 
 ### Gruppen
@@ -126,9 +151,9 @@ Die Werte werden genauso geprüft wie in den Dialogen (gleiche Bereiche, Einheit
 
 **Fenster hinzufügen** in vier Schritten:
 
-1. **Fenster:** Name, Rollo, Fensterkontakte, Gruppe (ohne Gruppe kein Sonnenschutz).
+1. **Fenster:** Name, Rollo, Fensterkontakte (auch Fenstergriffe), Kipp-Kontakte, Gruppe (ohne Gruppe kein Sonnenschutz).
 2. **Sonnenschutz:** Schwellen für die Sensortypen der Gruppe, Außentemperatur mindestens (19 °C), Haltezeiten Temperatur (10 min) und Sonne (5 min), Raumtemperatur (Thermostat: zu warm ab Sollwert + 2 K, Sensor: ab 24 °C), Klimaanlage, Sonnenschutz-Position (10 %), Toleranz für Auto-Hoch (5 %), Auto-Hoch, Benachrichtigung bei offenem Fenster, manueller Sonnenschutz bis (25 %), Erkennungszeitraum (5 min), Nachlauf (5 min), Fahrt auf Sonnenschutz-Position zählt.
-3. **Verhalten:** Übersteuerung (60 min, Sonnenaufgang, Abend- und Urlaubsfahrten trotz Übersteuerung), Zusatzbedingungen, Abend (Abendlauf, Nachziehen, eigene Abendzeiten), Lüften (30 %, gilt als geschlossen bis 5 %, 3 s abends, 60 s tagsüber), Urlaubssimulation.
+3. **Verhalten:** Übersteuerung (60 min, Sonnenaufgang, Abend- und Urlaubsfahrten trotz Übersteuerung), Zusatzbedingungen, Abend (Abendlauf, Abendposition 0 %, Nachziehen, eigene Abendzeiten), Lüften (30 %, gilt als geschlossen bis 5 %, 3 s abends, 60 s tagsüber), Urlaubssimulation, Wetterschutz & Tür (Position bei Wind und Regen, tiefste Position bei Frost, Aussperrschutz).
 4. **Morgenöffnung:** an oder aus, Modus und Zeitfenster, danach die Einstellungen des Modus.
 
 Positionen: 100 % = offen, 0 % = zu.
@@ -141,17 +166,56 @@ Global (Gerät "Shutter Assistant"):
 
 * Schalter **Automatik** (aus = keine automatische Fahrt; bleibt über Neustarts erhalten)
 * Binärsensoren **Sommertag** und **Abendmodus**
+* Binärsensoren **Windschutz**, **Regenschutz** und **Frostschutz** (nur wenn eingerichtet, mit dem Ende der Freigabezeit)
 * Sensor **Vorhersage Höchsttemperatur**
 
 Je Fenster (eigenes Gerät):
 
-* Sensor **Status** (Automatik aus, Neustart-Schutz, Manuelle Übersteuerung, Abends geschlossen, Sonnenschutz, Urlaubssimulation, Bereit)
+* Sensor **Status** (Wetterschutz, Automatik aus, Neustart-Schutz, Manuelle Übersteuerung, Abends geschlossen, Sonnenschutz, Urlaubssimulation, Bereit)
 * Sensor **Letzter Grund** (Text, Code, Position, Zeit)
+* Sensor **Nächste Aktion** (Zeitpunkt, Attribut `action`: Abendlauf, Morgenöffnung, Ende der Übersteuerung, Sonne kommt in oder verlässt den Bereich, Wetterschutz kann enden)
+* Schalter **Automatik** (nur dieses Fenster; der Wetterschutz läuft weiter) und **Sonnenschutz** (aus = bei Sonne nicht absenken; schon abgesenkte Rollos öffnen wieder wie gewohnt), beide bleiben über Neustarts erhalten
 * Binärsensoren **Manuelle Übersteuerung** (mit Ende), **Sonnenbedingung** (mit Teilbedingungen), **Sonnenschutz heute**, **Abends geschlossen**
 
 Für Kontroll-Karten im Dashboard liefern **Sonnenbedingung** (Schwellen, Sensoren, Azimut-Bereich, Haltezeiten und wann sie ablaufen) und **Status** (Rollo, Fensterkontakte, Abendbeginn, Übersteuerung bis) alle Werte als Attribute. **Abendmodus** hat Beginn und Ende des aktuellen oder nächsten Abends, **Automatik** das Ende eines laufenden Neustart-Schutzes.
 
 Jede Fahrt und jede Übersteuerung steht mit Grund im **Logbuch**.
+
+## Services und Ereignisse
+
+Alle Services wirken auf die Rollos konfigurierter Fenster (`entity_id`, auch eine Entität des Fensters); ohne `entity_id` auf alle Fenster. Sie starten keine Übersteuerung.
+
+| Service | Wirkung |
+|---|---|
+| `shutter_assistant.move` | `action`: `open`, `close`, `evening` (Abendposition, als „abends geschlossen“ vorgemerkt), `sun_protection` (Sonnenschutz-Position, als Sonnenschutz vorgemerkt, öffnet später per Auto-Hoch), `ventilation` oder `position` mit `position`. Frost- und Aussperrschutz gelten weiter. |
+| `shutter_assistant.start_override` | Übersteuerung wie eine Fahrt von Hand; `duration` in Minuten (leer = Dauer des Fensters, 0 = bis Sonnenaufgang) |
+| `shutter_assistant.end_override` | laufende Übersteuerung beenden |
+| `shutter_assistant.resume` | Übersteuerung beenden und sofort entscheiden lassen (Sonnenschutz, Abendlauf) |
+
+```yaml
+# Beispiel: bei Gewitterwarnung alle Rollos im Erdgeschoss auf die Abendposition
+action: shutter_assistant.move
+data:
+  entity_id: [cover.wohnzimmer, cover.kueche]
+  action: evening
+```
+
+Ereignisse für eigene Automationen:
+
+* `shutter_assistant_cover_moved`: jeder Fahrbefehl mit `window`, `window_id`, `entity_id`, `position` und `reason` (z. B. `sun_lower`, `evening_close`, `protection_wind`, `service`)
+* `shutter_assistant_cover_failed`: Ziel auch nach der Wiederholung nicht erreicht, mit `position` und `current_position`
+* `shutter_assistant_protection`: Wetterschutz beginnt oder endet, mit `kind` und `active`
+
+## Dashboard-Karte
+
+Für alle Nutzer (auch ohne Admin-Rechte) gibt es die Karte **Shutter Assistant** im Karten-Dialog: alle Fenster mit Status, Position, Fensterkontakt, nächster Aktion und laufender Übersteuerung (mit „Automatik fortsetzen“), Knöpfe für Auf, Stopp und Ab (wirken wie ein Taster, starten also eine Übersteuerung), aktiver Wetterschutz und ein kleiner Sonnenkompass. Einstellen lässt sich über die Karte nichts.
+
+```yaml
+type: custom:shutter-assistant-card
+title: Rollos            # optional
+windows: [Wohnzimmer]    # optional: Namen oder IDs, Standard alle
+compass: true            # optional: Sonnenkompass anzeigen
+```
 
 ## Eigene Dashboard-Karten
 
@@ -182,6 +246,8 @@ entities:
 * **Übersteuerung startet ungewollt:** „Nur wenn das Rollo wirklich fährt“ wählen (Dashboard **Allgemein**, Karte **Manuelle Übersteuerung**). Fahrten anderer Automationen und Skripte zählen nie.
 * **Keine Vorhersage:** Dashboard und Reparaturen zeigen einen Hinweis, wenn die Wetter-Entität keine Vorhersage liefert. Vorhersage-Art oder eine andere Wetter-Entität wählen.
 * **Rollo fährt nicht auf eine Position:** Rollos ohne Positionsunterstützung können nur auf und zu (im Log steht eine Warnung).
+* **Meldung „Rollo hat … % nicht erreicht“:** das Rollo meldet seine Position nicht oder ungenau. „Position prüfen nach“ (Erweitert) verlängern oder auf 0 stellen.
+* **Rollo bleibt oben bzw. auf der Lüftungsposition:** Wetterschutz aktiv (Status „Wetterschutz“), Fenster gekippt, Aussperrschutz einer offenen Tür oder Frost. Der letzte Grund und die Übersicht zeigen, was gilt.
 * **Diagnose:** Einstellungen > Geräte & Dienste > Shutter Assistant > ⋮ > Diagnose herunterladen (Benachrichtigungsdienste sind geschwärzt).
 
 ### Debug-Log

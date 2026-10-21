@@ -108,6 +108,7 @@ async def base_states(hass: HomeAssistant, setup_location) -> None:
 def make_entry(
     window: dict[str, Any] | None = None,
     group: dict[str, Any] | None = None,
+    extra_windows: dict[str, dict[str, Any]] | None = None,
     **options: Any,
 ) -> MockConfigEntry:
     return MockConfigEntry(
@@ -119,6 +120,8 @@ def make_entry(
             CONF_OUTDOOR_TEMP: OUTDOOR,
             "notify_services": ["notify.phone"],
             "vacation_entities": [VACATION],
+            # the mocked covers never move: no position check unless a test wants it
+            "verify_after": 0,
             **options,
         },
         subentries_data=[
@@ -135,6 +138,16 @@ def make_entry(
                 subentry_type=SUBENTRY_WINDOW,
                 title=(window or {}).get("name", WINDOW_DATA["name"]),
                 unique_id=None,
+            ),
+            *(
+                ConfigSubentryData(
+                    data=data,
+                    subentry_id=sub_id,
+                    subentry_type=SUBENTRY_WINDOW,
+                    title=data["name"],
+                    unique_id=None,
+                )
+                for sub_id, data in (extra_windows or {}).items()
             ),
         ],
     )

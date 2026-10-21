@@ -115,3 +115,16 @@ def test_override_until() -> None:
     assert override_until(now, 0, sunrise) == sunrise
     # polar day or night: no sunrise
     assert override_until(now, 0, None) == now + timedelta(hours=24)
+
+
+def test_reached() -> None:
+    from logic.override import reached
+
+    assert reached(10, 12, "open")
+    assert reached(10, 15, "open")
+    assert not reached(10, 16, "open")
+    # without a position only the end positions can be checked
+    assert reached(100, None, "open")
+    assert not reached(100, None, "closed")
+    assert reached(0, None, "closed")
+    assert reached(50, None, "open")

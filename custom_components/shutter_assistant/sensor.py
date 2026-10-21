@@ -1,7 +1,8 @@
-"""Sensors: forecast high, and status plus last reason of every window."""
+"""Sensors: forecast high, and status, last reason and next action of every window."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
@@ -25,7 +26,11 @@ async def async_setup_entry(
     async_add_entities([ForecastMax(engine)])
     for window_id in engine.windows:
         async_add_entities(
-            [Status(engine, window_id), LastReason(engine, window_id)],
+            [
+                Status(engine, window_id),
+                LastReason(engine, window_id),
+                NextAction(engine, window_id),
+            ],
             config_subentry_id=window_id,
         )
 
@@ -89,3 +94,22 @@ class LastReason(WindowEntity, SensorEntity):
             "position": reason.get("position"),
             "time": reason.get("time"),
         }
+
+
+class NextAction(WindowEntity, SensorEntity):
+    """When the window may move next and why (evening, morning, sun, override end)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, engine: ShutterEngine, window_id: str) -> None:
+        super().__init__(engine, window_id, "next_action")
+
+    @property
+    def native_value(self) -> datetime | None:
+        found = self.coordinator.next_action(self.window)
+        return found[0] if found else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        found = self.coordinator.next_action(self.window)
+        return {"action": found[1] if found else None}

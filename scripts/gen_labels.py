@@ -53,7 +53,13 @@ def labels(data: dict[str, Any]) -> dict[str, list[str]]:
 
 
 def build() -> str:
-    out: dict[str, dict[str, Any]] = {"LABELS": {}, "CHOICES": {}, "ERRORS": {}, "STATUS": {}}
+    out: dict[str, dict[str, Any]] = {
+        "LABELS": {},
+        "CHOICES": {},
+        "ERRORS": {},
+        "STATUS": {},
+        "NEXT_ACTION": {},
+    }
     for language in LANGUAGES:
         data = json.loads((TRANSLATIONS / f"{language}.json").read_text(encoding="utf-8"))
         out["LABELS"][language] = labels(data)
@@ -62,6 +68,8 @@ def build() -> str:
         }
         out["ERRORS"][language] = data["config"]["error"]
         out["STATUS"][language] = data["entity"]["sensor"]["status"]["state"]
+        next_action = data["entity"]["sensor"]["next_action"]["state_attributes"]["action"]
+        out["NEXT_ACTION"][language] = next_action["state"]
     parts = [HEADER]
     for name, value in out.items():
         parts.append(f"export const {name} = {json.dumps(value, ensure_ascii=False, indent=1)};\n")

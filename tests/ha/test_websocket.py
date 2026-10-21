@@ -477,6 +477,26 @@ async def test_commands_need_an_admin(
         assert result["error"]["code"] == "unauthorized"
 
 
+async def test_card_for_every_user(
+    hass: HomeAssistant, base_states, hass_ws_client, hass_read_only_access_token
+) -> None:
+    await setup_entry(hass, make_entry())
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    result = await _send(client, type="shutter_assistant/card")
+    assert result["success"]
+    card = result["result"]
+    assert card["loaded"] is True
+    assert card["language"] == "en"
+    assert card["groups"][0]["azimuth_from"] == 90
+    window = card["windows"][0]
+    assert window["id"] == WINDOW_ID and window["cover"] == "cover.living_room"
+    assert window["entities"]["status"] == "sensor.living_room_status"
+    assert window["entities"]["next_action"] == "sensor.living_room_next_action"
+    assert card["entities"]["automatic"] == "switch.shutter_assistant_automatic"
+    # no settings for the card
+    assert "options" not in card and "data" not in window
+
+
 async def test_cover_and_sensor_checks(hass: HomeAssistant, base_states, hass_ws_client) -> None:
     entry = make_entry()
     await setup_entry(hass, entry)

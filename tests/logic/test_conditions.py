@@ -151,3 +151,25 @@ def test_heat_need() -> None:
     assert not heat_need(False, False, False)
     # a cooling air conditioner counts as a warm room
     assert heat_need(False, True, True)
+
+
+def test_window_contact_open_tilted_closed() -> None:
+    from logic.conditions import reported_open, window_contact
+
+    assert window_contact(["off"]) == "closed"
+    assert window_contact(["on"]) == "open"
+    # unknown is not safe
+    assert window_contact(["unavailable"]) == "open"
+    assert window_contact([None]) == "open"
+    # window handle
+    assert window_contact(["tilted"]) == "tilted"
+    assert window_contact(["closed"]) == "closed"
+    assert window_contact(["open"]) == "open"
+    # tilt contact: on (or unknown) = tilted, open wins
+    assert window_contact(["off"], ["on"]) == "tilted"
+    assert window_contact(["off"], ["unavailable"]) == "tilted"
+    assert window_contact(["on"], ["on"]) == "open"
+    assert window_contact(["off"], ["off"]) == "closed"
+    assert window_contact([]) == "closed"
+    assert reported_open(["on"]) and reported_open(["open"])
+    assert not reported_open(["unavailable"]) and not reported_open(["tilted"])

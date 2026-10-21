@@ -6,15 +6,27 @@
       "override": { "default": "mdi:hand-back-right-outline", "state": { "off": "mdi:hand-back-right-off-outline" } },
       "sun_condition": { "default": "mdi:white-balance-sunny", "state": { "off": "mdi:weather-partly-cloudy" } },
       "sun_protection_today": { "default": "mdi:roller-shade-closed", "state": { "off": "mdi:roller-shade" } },
-      "evening_closed": { "default": "mdi:window-shutter", "state": { "off": "mdi:window-shutter-open" } }
+      "evening_closed": { "default": "mdi:window-shutter", "state": { "off": "mdi:window-shutter-open" } },
+      "wind_protection": { "default": "mdi:weather-windy" },
+      "rain_protection": { "default": "mdi:weather-pouring" },
+      "frost_protection": { "default": "mdi:snowflake" }
     },
     "sensor": {
       "forecast_max": { "default": "mdi:thermometer-high" },
       "status": { "default": "mdi:roller-shade" },
-      "last_reason": { "default": "mdi:message-text-clock-outline" }
+      "last_reason": { "default": "mdi:message-text-clock-outline" },
+      "next_action": { "default": "mdi:clock-outline" }
     },
     "switch": {
-      "automatic": { "default": "mdi:roller-shade", "state": { "off": "mdi:roller-shade-closed" } }
+      "automatic": { "default": "mdi:roller-shade", "state": { "off": "mdi:roller-shade-closed" } },
+      "window_automatic": { "default": "mdi:window-shutter-auto", "state": { "off": "mdi:window-shutter-alert" } },
+      "window_sun_protection": { "default": "mdi:white-balance-sunny", "state": { "off": "mdi:weather-sunny-off" } }
     }
+  },
+  "services": {
+    "move": { "service": "mdi:window-shutter-cog" },
+    "start_override": { "service": "mdi:hand-back-right-outline" },
+    "end_override": { "service": "mdi:hand-back-right-off-outline" },
+    "resume": { "service": "mdi:play-circle-outline" }
   }
 }

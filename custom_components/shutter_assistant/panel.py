@@ -1,4 +1,4 @@
-"""Sidebar panel: an overview and all settings on one page."""
+"""Sidebar panel (overview and all settings) and the dashboard card."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ STATIC_URL = "/shutter_assistant_static"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 DATA_STATIC = f"{DOMAIN}_static_registered"
 DATA_SIDEBAR = f"{DOMAIN}_panel_in_sidebar"
+# url of the dashboard card module (loaded on every dashboard, for every user)
+DATA_CARD = f"{DOMAIN}_card_url"
 
 
 async def async_register_panel(hass: HomeAssistant, entry_id: str, sidebar: bool = True) -> None:
@@ -33,11 +35,17 @@ async def async_register_panel(hass: HomeAssistant, entry_id: str, sidebar: bool
             [StaticPathConfig(STATIC_URL, str(FRONTEND_DIR), cache_headers=False)]
         )
         hass.data[DATA_STATIC] = True
+    version = await hass.async_add_executor_job(_version)
+    card = f"{STATIC_URL}/card.js?v={version}"
+    if hass.data.get(DATA_CARD) != card:
+        if old := hass.data.get(DATA_CARD):
+            frontend.remove_extra_js_url(hass, old)
+        frontend.add_extra_js_url(hass, card)
+        hass.data[DATA_CARD] = card
     if frontend.async_panel_exists(hass, PANEL_URL_PATH):
         if hass.data.get(DATA_SIDEBAR) == sidebar:
             return
         frontend.async_remove_panel(hass, PANEL_URL_PATH, warn_if_unknown=False)
-    version = await hass.async_add_executor_job(_version)
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=PANEL_URL_PATH,
@@ -60,6 +68,8 @@ def async_unregister_panel(hass: HomeAssistant) -> None:
     if frontend.async_panel_exists(hass, PANEL_URL_PATH):
         frontend.async_remove_panel(hass, PANEL_URL_PATH, warn_if_unknown=False)
     hass.data.pop(DATA_SIDEBAR, None)
+    if card := hass.data.pop(DATA_CARD, None):
+        frontend.remove_extra_js_url(hass, card)
 
 
 def _version() -> str:

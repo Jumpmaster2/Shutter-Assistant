@@ -53,6 +53,7 @@ from .const import (
     CONF_AZIMUTH_TO,
     CONF_CATCH_UP_AFTER,
     CONF_CLOSED_POSITION,
+    CONF_COMMAND_INTERVAL,
     CONF_COOLING_ENTITY,
     CONF_COVER,
     CONF_DAY_CHANGE,
@@ -61,12 +62,16 @@ from .const import (
     CONF_EVENING_EARLIEST,
     CONF_EVENING_ELEVATION,
     CONF_EVENING_LATEST,
+    CONF_EVENING_POSITION,
     CONF_FOLLOW_UP_CLOSE,
     CONF_FOLLOW_UP_EARLIEST,
     CONF_FORECAST_TYPE,
+    CONF_FROST_POSITION,
+    CONF_FROST_THRESHOLD,
     CONF_GROUP,
     CONF_HEATING_ENTITY,
     CONF_LANGUAGE,
+    CONF_LOCKOUT,
     CONF_MANUAL_AT_SUN,
     CONF_MANUAL_FOLLOW_UP,
     CONF_MANUAL_MAX,
@@ -97,6 +102,10 @@ from .const import (
     CONF_OVERRIDE_IGNORE_EVENING,
     CONF_OVERRIDE_SUNRISE,
     CONF_OVERRIDE_TRIGGER,
+    CONF_PROTECTION_RELEASE,
+    CONF_RAIN_ENTITY,
+    CONF_RAIN_POSITION,
+    CONF_RAIN_THRESHOLD,
     CONF_ROOM_ENTITY,
     CONF_ROOM_MARGIN,
     CONF_ROOM_THRESHOLD,
@@ -106,6 +115,7 @@ from .const import (
     CONF_SUN_POSITION,
     CONF_TEMP_HOLD,
     CONF_TEMP_THRESHOLD,
+    CONF_TILT_SENSORS,
     CONF_TOLERANCE,
     CONF_TRIGGER_ACTIVE,
     CONF_TRIGGER_ENTITIES,
@@ -125,14 +135,21 @@ from .const import (
     CONF_VENT_DELAY_EVENING,
     CONF_VENT_POSITION,
     CONF_VENTILATION,
+    CONF_VERIFY_AFTER,
     CONF_WEATHER,
     CONF_WEEKEND_DAYS,
+    CONF_WIND_ENTITY,
+    CONF_WIND_POSITION,
+    CONF_WIND_THRESHOLD,
     CONF_WINDOW_DEBOUNCE,
     CONF_WINDOW_EXCEPTION,
     CONF_WINDOW_SENSORS,
     CONF_WORKDAY,
     DOMAIN,
+    EVENT_COVER_FAILED,
+    EVENT_COVER_MOVED,
     EVENT_LOGBOOK,
+    EVENT_PROTECTION,
     GROUP_DEFAULTS,
     LOGGER,
     NAME,
@@ -148,18 +165,31 @@ from .logic import morning as mo
 from .logic import sun as sunlib
 from .logic import window as rules
 from .logic.conditions import (
+    CONTACT_CLOSED,
+    CONTACT_OPEN,
+    CONTACT_TILTED,
     FollowUp,
     Hold,
     as_float,
     at_least,
     cooling_active,
     heat_need,
+    reported_open,
     room_warm,
     sensors_ok,
     summer_day,
+    window_contact,
 )
 from .logic.evening import EveningSettings, evening_day, evening_end, evening_start, is_evening
-from .logic.override import MOVING, CommandTracker, MovementWatch, is_manual, override_until
+from .logic.override import (
+    MOVING,
+    CommandTracker,
+    MovementWatch,
+    is_manual,
+    override_until,
+    reached,
+)
+from .logic.protection import FROST, KINDS, RAIN, WIND, Guard, above, freezing, raining
 from .logic.vacation import random_position, random_time
 from .messages import resolve_language, text
 from .units import defaults, temperature_unit, window_defaults
@@ -173,6 +203,8 @@ FORECAST_RETRY = timedelta(minutes=30)
 FORECAST_TIMEOUT = 30
 ISSUE_MISSING_GROUP = "missing_group_"
 ISSUE_FORECAST = "forecast_unsupported"
+# moves of the weather protection (frost and a tilted window do not limit them)
+PROTECTIVE = (rules.R_PROTECT_WIND, rules.R_PROTECT_RAIN)
 
 
 def parse_time(value: Any, fallback: str = "00:00:00") -> time:
@@ -237,6 +269,17 @@ class Window:
     morning_pending: bool = False
     # evening run skipped because the automatic was off (caught up when switched on)
     evening_missed: date | None = None
+    tilt_sensors: list[str] = field(default_factory=list)
+    window_tilted: bool = False
+    # wind or rain protection running for this window
+    protection: str | None = None
+    # switches of the window (persisted)
+    automatic: bool = True
+    sun_enabled: bool = True
+    # last command, checked after the verify time: target, reason, attempt
+    verify: tuple[int, str, int] | None = None
+    # the cover was still moving at the check: one more look later
+    verify_waited: bool = False
 
     @property
     def override_active(self) -> bool:
@@ -277,7 +320,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self._timer_due: dict[str, datetime] = {}
         self._evening_cache: dict[tuple[EveningSettings, date], tuple[datetime, datetime]] = {}
         self._rng = random.Random()
+        # cover -> (window id, target, reason, attempt), sent with the command spacing
+        self._queue: dict[str, tuple[str, int, str, int]] = {}
         self._outdoor_last: float | None = None
+        release = float(self.opt(CONF_PROTECTION_RELEASE)) * 60
+        self.guards: dict[str, Guard] = {kind: Guard(release) for kind in KINDS}
         self._build()
 
     # ------------------------------------------------------------------ config
@@ -354,6 +401,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             name=title,
             cover=str(conf[CONF_COVER]),
             sensors=list(conf.get(CONF_WINDOW_SENSORS) or []),
+            tilt_sensors=list(conf.get(CONF_TILT_SENSORS) or []),
             group_id=group_id,
             conf=conf,
             rules=rules.WindowRules(
@@ -365,6 +413,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 manual_at_sun_position=bool(conf[CONF_MANUAL_AT_SUN]),
                 override_ignore_evening=bool(conf[CONF_OVERRIDE_IGNORE_EVENING]),
                 evening_close=bool(conf[CONF_EVENING_CLOSE]),
+                evening_position=int(conf[CONF_EVENING_POSITION]),
                 follow_up_close=bool(conf[CONF_FOLLOW_UP_CLOSE]),
                 ventilation=bool(conf[CONF_VENTILATION]),
                 ventilation_position=int(conf[CONF_VENT_POSITION]),
@@ -374,6 +423,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 morning=bool(conf[CONF_MORNING]),
                 morning_position=int(conf[CONF_MORNING_POSITION]),
                 morning_sun_position=bool(conf[CONF_MORNING_SUN_POSITION]),
+                wind_position=_int(conf.get(CONF_WIND_POSITION)),
+                rain_position=_int(conf.get(CONF_RAIN_POSITION)),
+                frost_position=_int(conf.get(CONF_FROST_POSITION)),
+                lockout=bool(conf[CONF_LOCKOUT]),
             ),
             evening_settings=evening_settings,
             morning_settings=morning_settings,
@@ -394,7 +447,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self._restore(stored)
         now = dt_util.now()
         for win in self.windows.values():
-            win.window_open = self._window_open_now(win)
+            self._set_contact(win)
             win.trigger.active = self._trigger_active(win)
         self._update_issues()
         self._register_listeners()
@@ -410,6 +463,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         for group in self.groups.values():
             self._schedule_sector(group, now)
         self._schedule_global_evening(now)
+        self._update_protection(now)
         if self.startup_until is None:
             # reload while running: no restart protection, evaluate right away
             for win in self.windows.values():
@@ -436,6 +490,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self.forecast_night_low = as_float(stored.get("forecast_night_low"))
         self.raised_day = _to_date(stored.get("raised_day"))
         self.vacation_evening_day = _to_date(stored.get("vacation_evening_day"))
+        for kind, data in (stored.get("protection") or {}).items():
+            if (guard := self.guards.get(kind)) is not None and data.get("active"):
+                guard.active = True
+                guard.release_due = as_float(data.get("release_due"))
         windows = stored.get("windows") or {}
         now = dt_util.utcnow()
         for wid, win in self.windows.items():
@@ -452,6 +510,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             win.morning_day = _to_date(data.get("morning_day"))
             win.last_manual = _to_datetime(data.get("last_manual"))
             win.last_reason = data.get("last_reason") or {}
+            win.automatic = bool(data.get("automatic", True))
+            win.sun_enabled = bool(data.get("sun_enabled", True))
             locked = _to_datetime(data.get("trigger_locked_until"))
             if locked is not None and locked > now:
                 win.trigger.locked_until = locked
@@ -465,6 +525,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             "forecast_night_low": self.forecast_night_low,
             "raised_day": _iso(self.raised_day),
             "vacation_evening_day": _iso(self.vacation_evening_day),
+            "protection": {
+                kind: {"active": guard.active, "release_due": guard.release_due}
+                for kind, guard in self.guards.items()
+            },
             "windows": {
                 wid: {
                     "override_until": _iso(win.override_until),
@@ -478,6 +542,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     "last_reason": win.last_reason,
                     "trigger_locked_until": _iso(win.trigger.locked_until),
                     "trigger_pending": win.trigger.pending,
+                    "automatic": win.automatic,
+                    "sun_enabled": win.sun_enabled,
                 }
                 for wid, win in self.windows.items()
             },
@@ -539,7 +605,14 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         track({outdoor} if outdoor else set(), self._on_outdoor)
         sensors = {e for g in self.groups.values() for lst in g.sensors.values() for e in lst}
         track(sensors, self._on_sun_sensor)
-        track({e for w in self.windows.values() for e in w.sensors}, self._on_window_sensor)
+        track(
+            {e for w in self.windows.values() for e in (*w.sensors, *w.tilt_sensors)},
+            self._on_window_sensor,
+        )
+        weather = {
+            str(self.opt(key)) for key in (CONF_WIND_ENTITY, CONF_RAIN_ENTITY) if self.opt(key)
+        }
+        track(weather, self._on_weather)
         track({w.cover for w in self.windows.values()}, self._on_cover)
         blocks = {
             str(w.conf.get(e))
@@ -647,9 +720,24 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             return rules.CLOSED
         return None
 
+    def _contact(self, win: Window) -> str:
+        """Open, tilted or closed. A contact not reporting closed counts as open
+        (unknown is not safe), a tilt contact as tilted."""
+        return window_contact(
+            [self._state_value(e) for e in win.sensors],
+            [self._state_value(e) for e in win.tilt_sensors],
+        )
+
     def _window_open_now(self, win: Window) -> bool:
-        """Any contact not reporting closed counts as open (unknown is not safe)."""
-        return any(self._state_value(e) != "off" for e in win.sensors)
+        return self._contact(win) == CONTACT_OPEN
+
+    def _set_contact(self, win: Window) -> bool:
+        """Store the contact state of the window. True if it changed."""
+        contact = self._contact(win)
+        state = (contact == CONTACT_OPEN, contact == CONTACT_TILTED)
+        changed = state != (win.window_open, win.window_tilted)
+        win.window_open, win.window_tilted = state
+        return changed
 
     def _window_exception(self, win: Window) -> bool:
         entity = win.conf.get(CONF_WINDOW_EXCEPTION)
@@ -877,11 +965,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     def _situation(self, win: Window, now: datetime) -> rules.Situation:
         flags = win.flags or (False,) * 8
         return rules.Situation(
-            automatic=self.automatic,
+            automatic=self.automatic and win.automatic,
             startup=self._startup(now),
             position=self._position(win),
             window_open=win.window_open,
-            window_on=any(self._state_value(e) == STATE_ON for e in win.sensors),
+            window_on=reported_open([self._state_value(e) for e in win.sensors]),
             window_exception=self._window_exception(win),
             override=win.override_active,
             sun_marker=self.sun_marker(win, now),
@@ -894,6 +982,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             evening=self._evening(win, now),
             open_blocked=self._open_blocked(win),
             vacation=self.vacation,
+            protection=win.protection,
+            frost=self.guards[FROST].active,
+            window_tilted=win.window_tilted,
+            sun_enabled=win.sun_enabled,
         )
 
     def status(self, win: Window) -> str:
@@ -963,6 +1055,9 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             "cover": win.cover,
             "window_sensors": win.sensors,
             "window_open": win.window_open,
+            "window_tilted": win.window_tilted,
+            "protection": win.protection,
+            "frost": self.guards[FROST].active,
             "evening": self._evening(win, now),
             "evening_start": start.isoformat(),
             "evening_end": end.isoformat(),
@@ -979,9 +1074,15 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             return
         moves: list[tuple[int, str]] = []
         notify = False
+        situation: rules.Situation | None = None
         for action in actions:
             if action.kind == rules.POSITION and action.position is not None:
-                moves.append((action.position, action.reason))
+                situation = situation or self._situation(win, now)
+                target = rules.limit_target(
+                    win.rules, situation, action.position, action.reason in PROTECTIVE
+                )
+                if target is not None:
+                    moves.append((target, action.reason))
             elif action.kind == rules.MARK_SUN:
                 win.sun_day = self._sun_day(now)
             elif action.kind == rules.CLEAR_SUN:
@@ -996,15 +1097,18 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         reason = actions[0].reason
         position = moves[-1][0] if moves else None
         self._set_reason(win, reason, position, now)
-        for target, _reason in moves:
-            self._start_move(win, target)
+        for target, move_reason in moves:
+            self._start_move(win, target, move_reason)
         if notify:
-            self._create_task(self._async_notify(win), "notify")
+            self._notify_window_open(win)
         self._save()
         self.async_update_listeners()
 
     def _set_reason(self, win: Window, reason: str, position: int | None, now: datetime) -> None:
-        message = text(self.language, reason, position=position, name=win.name)
+        key = reason
+        if position and text(self.language, f"{reason}_partial") != f"{reason}_partial":
+            key = f"{reason}_partial"
+        message = text(self.language, key, position=position, name=win.name)
         win.last_reason = {
             "code": reason,
             "message": message,
@@ -1015,12 +1119,37 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             EVENT_LOGBOOK, {"name": win.name, "message": message, ATTR_ENTITY_ID: win.cover}
         )
 
-    def _start_move(self, win: Window, target: int) -> None:
+    def _start_move(self, win: Window, target: int, reason: str, attempt: int = 0) -> None:
+        """Queue a command; the queue keeps the spacing between commands."""
         state = self._state(win.cover)
         if state is None or state.state in INVALID:
             return
         if self._position(win) == target and state.state not in MOVING:
+            win.verify = None
             return
+        # only the latest command per cover counts
+        self._queue.pop(win.cover, None)
+        self._queue[win.cover] = (win.window_id, target, reason, attempt)
+        self._drain()
+
+    @callback
+    def _drain(self, _now: datetime | None = None) -> None:
+        """Send queued commands, one per command spacing (all at once without)."""
+        interval = float(self.opt(CONF_COMMAND_INTERVAL))
+        while self._queue and "queue" not in self._timers:
+            cover = next(iter(self._queue))
+            window_id, target, reason, attempt = self._queue.pop(cover)
+            win = self.windows.get(window_id)
+            if win is None or not self._send(win, target, reason, attempt):
+                continue
+            if interval > 0:
+                self._schedule("queue", dt_util.utcnow() + timedelta(seconds=interval), self._drain)
+
+    def _send(self, win: Window, target: int, reason: str, attempt: int) -> bool:
+        """Call the cover service. False if nothing was sent."""
+        state = self._state(win.cover)
+        if state is None or state.state in INVALID:
+            return False
         features = int(state.attributes.get(ATTR_SUPPORTED_FEATURES) or 0)
         data: dict[str, Any] = {ATTR_ENTITY_ID: win.cover}
         if target >= rules.OPEN:
@@ -1032,10 +1161,77 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             data["position"] = target
         else:
             LOGGER.warning("%s cannot move to %s %% (no position support)", win.cover, target)
-            return
+            return False
         context = Context()
         self.tracker.register(win.cover, target, context.id, self._now_ts)
         self._create_task(self._async_call("cover", service, data, context), "cover")
+        self.hass.bus.async_fire(
+            EVENT_COVER_MOVED,
+            {
+                "window": win.name,
+                "window_id": win.window_id,
+                ATTR_ENTITY_ID: win.cover,
+                "position": target,
+                "reason": reason,
+            },
+            context=context,
+        )
+        verify_after = float(self.opt(CONF_VERIFY_AFTER))
+        if verify_after > 0:
+            win.verify = (target, reason, attempt)
+            win.verify_waited = False
+            self._schedule(
+                f"{win.window_id}:verify",
+                dt_util.utcnow() + timedelta(seconds=verify_after),
+                lambda now, wid=win.window_id: self._on_verify(wid, now),
+            )
+        return True
+
+    @callback
+    def _on_verify(self, window_id: str, now: datetime) -> None:
+        """Repeat a command once if the cover did not reach its target, then report."""
+        win = self.windows.get(window_id)
+        if win is None or win.verify is None:
+            return
+        target, reason, attempt = win.verify
+        state = self._state(win.cover)
+        if state is not None and state.state in MOVING and not win.verify_waited:
+            # still moving: look once more later
+            win.verify_waited = True
+            self._schedule(
+                f"{win.window_id}:verify",
+                now + timedelta(seconds=float(self.opt(CONF_VERIFY_AFTER))),
+                lambda now, wid=window_id: self._on_verify(wid, now),
+            )
+            return
+        win.verify = None
+        current = self._position(win)
+        if reached(target, current, state.state if state else None):
+            return
+        if attempt == 0:
+            self._set_reason(win, "cover_retry", target, now)
+            self._start_move(win, target, reason, attempt=1)
+            return
+        self._set_reason(win, "cover_failed", target, now)
+        self.hass.bus.async_fire(
+            EVENT_COVER_FAILED,
+            {
+                "window": win.name,
+                "window_id": win.window_id,
+                ATTR_ENTITY_ID: win.cover,
+                "position": target,
+                "current_position": current,
+                "reason": reason,
+            },
+        )
+        self._create_task(
+            self._async_notify(
+                text(self.language, "notify_failed_title"),
+                text(self.language, "notify_cover_failed", name=win.name, position=target),
+            ),
+            "notify",
+        )
+        self.async_update_listeners()
 
     def _create_task(self, coro: Any, name: str) -> None:
         """Task bound to the config entry (waited for when the entry unloads)."""
@@ -1052,9 +1248,12 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         except (HomeAssistantError, ValueError) as err:
             LOGGER.warning("%s.%s failed: %s", domain, service, err)
 
-    async def _async_notify(self, win: Window) -> None:
+    def _notify_window_open(self, win: Window) -> None:
         title = text(self.language, "notify_title")
         message = text(self.language, "notify_window_open", name=win.name)
+        self._create_task(self._async_notify(title, message), "notify")
+
+    async def _async_notify(self, title: str, message: str) -> None:
         for target in self.opt(CONF_NOTIFY) or []:
             domain, _, service = str(target).partition(".")
             if not service:
@@ -1106,7 +1305,96 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             if self._refresh(win, now):
                 changed = True
                 self._evaluate(win, now)
+        if self._update_protection(now) or changed:
+            self.async_update_listeners()
+
+    # ------------------------------------------------------------------ weather protection
+
+    def protection_enabled(self, kind: str) -> bool:
+        """Wind and rain need their sensor, frost a window with a frost position."""
+        if kind == FROST:
+            return any(win.rules.frost_position is not None for win in self.windows.values())
+        return bool(self.opt(CONF_WIND_ENTITY if kind == WIND else CONF_RAIN_ENTITY))
+
+    def _protection_values(self) -> dict[str, bool | None]:
+        """Is each value on the dangerous side? None = invalid (keeps the state)."""
+        values: dict[str, bool | None] = dict.fromkeys(KINDS, False)
+        if self.protection_enabled(WIND):
+            wind = self._state_value(self.opt(CONF_WIND_ENTITY))
+            values[WIND] = above(wind, float(self.opt(CONF_WIND_THRESHOLD)))
+        if self.protection_enabled(RAIN):
+            rain = self._state_value(self.opt(CONF_RAIN_ENTITY))
+            values[RAIN] = raining(rain, float(self.opt(CONF_RAIN_THRESHOLD)))
+        if self.protection_enabled(FROST):
+            threshold = float(self.opt(CONF_FROST_THRESHOLD))
+            values[FROST] = freezing(self.outdoor_temperature, threshold)
+        return values
+
+    @property
+    def active_protections(self) -> frozenset[str]:
+        return frozenset(kind for kind, guard in self.guards.items() if guard.active)
+
+    def _update_protection(self, now: datetime) -> bool:
+        """Update wind, rain and frost and act on the windows. True if one changed."""
+        ts = now.timestamp()
+        values = self._protection_values()
+        changed = False
+        for kind, guard in self.guards.items():
+            if guard.update(values[kind], ts):
+                changed = True
+                name = text(self.language, f"kind_{kind}")
+                self.hass.bus.async_fire(EVENT_PROTECTION, {"kind": kind, "active": guard.active})
+                self.hass.bus.async_fire(
+                    EVENT_LOGBOOK,
+                    {
+                        "name": NAME,
+                        "message": text(
+                            self.language,
+                            "protection_on" if guard.active else "protection_off",
+                            kind=name,
+                        ),
+                    },
+                )
+            due = guard.due()
+            self._schedule(
+                f"protection:{kind}",
+                dt_util.utc_from_timestamp(due) if due is not None else None,
+                self._on_protection_due,
+            )
         if changed:
+            self._save()
+        active = self.active_protections
+        for win in self.windows.values():
+            kind = rules.protection_kind(win.rules, active)
+            if kind == win.protection:
+                continue
+            changed = True
+            win.protection = kind
+            if kind is not None:
+                self._protect(win, now)
+            else:
+                self._after_protection(win, now)
+        return changed
+
+    def _protect(self, win: Window, now: datetime) -> None:
+        self._apply(win, rules.protect(win.rules, self._situation(win, now)), now)
+
+    def _after_protection(self, win: Window, now: datetime) -> None:
+        """Protection ended: no old position is restored, the rules decide again."""
+        self._set_reason(win, "protection_end", None, now)
+        self._refresh(win, now)
+        if self._evening(win, now):
+            self._run_evening(win, now)
+        self._evaluate(win, now)
+
+    @callback
+    def _on_weather(self, _event: Event[EventStateChangedData]) -> None:
+        if self._update_protection(dt_util.now()):
+            self.async_update_listeners()
+
+    @callback
+    def _on_protection_due(self, now: datetime) -> None:
+        if self._update_protection(now):
             self.async_update_listeners()
 
     @callback
@@ -1168,22 +1456,29 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         new = event.data["new_state"]
         now = dt_util.now()
         for win in self.windows.values():
-            if entity_id not in win.sensors:
+            if entity_id not in win.sensors and entity_id not in win.tilt_sensors:
                 continue
-            open_now = self._window_open_now(win)
+            tilt = entity_id in win.tilt_sensors
+            contact = self._contact(win)
+            old_contact = window_contact(*_split(old.state if old else None, tilt))
+            new_contact = window_contact(*_split(new.state if new else None, tilt))
             really_opened = (
-                new is not None and new.state == STATE_ON and old is not None and old.state == "off"
+                old is not None
+                and new is not None
+                and old.state not in INVALID
+                and new.state not in INVALID
+                and old_contact == CONTACT_CLOSED
+                and new_contact != CONTACT_CLOSED
             )
-            if open_now:
+            opening = contact == CONTACT_OPEN or (contact == CONTACT_TILTED and not win.window_open)
+            if opening:
                 self._cancel(f"{win.window_id}:close")
-                was_open = win.window_open
-                win.window_open = True
+                if self._set_contact(win):
+                    self.async_update_listeners()
                 if really_opened:
                     self._window_opened(win, now)
-                if not was_open:
-                    self.async_update_listeners()
-            elif win.window_open:
-                # closed: counts after the debounce time
+            elif win.window_open or win.window_tilted:
+                # closed (or only tilted after open): counts after the debounce time
                 real = old is not None and old.state not in INVALID
                 self._schedule(
                     f"{win.window_id}:close",
@@ -1204,7 +1499,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     @callback
     def _ventilate(self, window_id: str, now: datetime) -> None:
         win = self.windows.get(window_id)
-        if win is None or not self._window_open_now(win):
+        if win is None or self._contact(win) == CONTACT_CLOSED:
             return
         self._apply(win, rules.ventilation(win.rules, self._situation(win, now)), now)
 
@@ -1213,7 +1508,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         win = self.windows.get(window_id)
         if win is None or self._window_open_now(win):
             return
-        win.window_open = False
+        self._set_contact(win)
         situation = self._situation(win, now)
         if real:
             after = dt_util.as_local(now).time() >= parse_time(
@@ -1224,6 +1519,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self._apply(win, rules.manual_sun(win.rules, situation, self._recent(win, now)), now)
         self._refresh(win, now)
         self._evaluate(win, now)
+        self._protect(win, now)
         if win.trigger.pending:
             self._try_trigger_close(win, now)
         self.async_update_listeners()
@@ -1299,11 +1595,15 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 self._evaluate(win, now)
         self.async_update_listeners()
 
-    def _start_override(self, win: Window, now: datetime) -> None:
-        duration = float(win.conf[CONF_OVERRIDE_DURATION])
+    def _start_override(self, win: Window, now: datetime, duration: float | None = None) -> None:
+        if duration is None:
+            duration = float(win.conf[CONF_OVERRIDE_DURATION])
         if not win.override_active:
             win.override_since = now
         win.last_manual = now
+        # moved by hand: the last command no longer needs to be checked
+        win.verify = None
+        self._cancel(f"{win.window_id}:verify")
         win.override_until = override_until(now, duration, self._next_sunrise)
         win.override_sunrise = bool(win.conf[CONF_OVERRIDE_SUNRISE]) or duration <= 0
         until = (
@@ -1348,6 +1648,94 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         self._refresh(win, now)
         self._evaluate(win, now)
         self.async_update_listeners()
+
+    # ------------------------------------------------------------------ switches, services
+
+    @callback
+    def set_window_switch(self, window_id: str, key: str, on: bool) -> None:
+        """Automatic or sun protection of one window (kept over restarts)."""
+        win = self.windows[window_id]
+        setattr(win, key, on)
+        self._save()
+        if on:
+            now = dt_util.now()
+            self._refresh(win, now)
+            self._evaluate(win, now)
+        self.async_update_listeners()
+
+    def window_by_cover(self, cover: str) -> Window | None:
+        return next((win for win in self.windows.values() if win.cover == cover), None)
+
+    @callback
+    def service_move(self, window_id: str, action: str, position: int | None = None) -> None:
+        """Move a window by service (no override; frost and the lockout still apply)."""
+        win = self.windows[window_id]
+        now = dt_util.now()
+        targets = {
+            "open": rules.OPEN,
+            "close": rules.CLOSED,
+            "evening": win.rules.evening_position,
+            "sun_protection": win.rules.sun_position,
+            "ventilation": win.rules.ventilation_position,
+        }
+        target = position if action == "position" else targets[action]
+        if target is None:
+            return
+        actions = [rules.Action(rules.POSITION, "service", int(target))]
+        # remembered like the automatic would: no second evening run, auto up later
+        if action == "evening":
+            actions.append(rules.Action(rules.MARK_EVENING, "service"))
+        elif action == "sun_protection":
+            actions.append(rules.Action(rules.MARK_SUN, "service"))
+        self._apply(win, actions, now)
+
+    @callback
+    def start_override(self, window_id: str, duration: float | None = None) -> None:
+        """Start an override by service, with its own duration (minutes) if given."""
+        win = self.windows[window_id]
+        self._start_override(win, dt_util.now(), duration)
+        self.async_update_listeners()
+
+    @callback
+    def resume(self, window_id: str) -> None:
+        """End an override and let the rules decide right away."""
+        win = self.windows[window_id]
+        now = dt_util.now()
+        if win.override_active:
+            self._end_override(window_id, now)
+        self._set_reason(win, "resume", None, now)
+        self._refresh(win, now)
+        if self._evening(win, now):
+            self._run_evening(win, now)
+        self._evaluate(win, now)
+        self.async_update_listeners()
+
+    def next_action(self, win: Window) -> tuple[datetime, str] | None:
+        """The next planned point in time that may move the window."""
+        now = dt_util.now()
+        found: list[tuple[datetime, str]] = []
+
+        def due(key: str, action: str) -> None:
+            if (when := self._timer_due.get(key)) is not None and when > now:
+                found.append((when, action))
+
+        release = self.guards[win.protection].due() if win.protection else None
+        if release is not None:
+            found.append((dt_util.utc_from_timestamp(release), "protection_end"))
+        if win.override_active and win.override_until is not None:
+            found.append((win.override_until, "override_end"))
+        if win.rules.evening_close:
+            due(f"{win.window_id}:evening", "evening")
+        due(f"{win.window_id}:morning", "morning")
+        if win.group_id:
+            if self.sun_marker(win) and win.rules.auto_up and self.in_sector(win):
+                due(f"sector:{win.group_id}", "sun_leave")
+            elif self.summer and win.sun_enabled and not self.in_sector(win):
+                due(f"sector:{win.group_id}", "sun_enter")
+        if not found:
+            return None
+        when, action = min(found, key=lambda item: item[0])
+        return dt_util.as_local(when), action
 
     @callback
     def end_override(self, window_id: str) -> bool:
@@ -1604,6 +1992,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         )
         for win in self.windows.values():
             self._refresh(win, now)
+            self._protect(win, now)
             if catch_up and self._evening(win, now):
                 self._run_evening(win, now)
             self._evaluate(win, now)
@@ -1820,6 +2209,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             "evening": self.global_evening_active,
             "vacation": self.vacation,
             "startup_until": _iso(self.startup_until),
+            "protection": {
+                kind: {"active": guard.active, "release_due": guard.release_due}
+                for kind, guard in self.guards.items()
+            },
+            "queued_commands": len(self._queue),
             "groups": {gid: g.name for gid, g in self.groups.items()},
             "windows": {
                 wid: {
@@ -1827,6 +2221,9 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     "situation": self._situation(win, now).__dict__,
                     "last_reason": win.last_reason,
                     "override_until": _iso(win.override_until),
+                    "automatic": win.automatic,
+                    "sun_enabled": win.sun_enabled,
+                    "verify": win.verify,
                     "timers": sorted(k for k in self._timers if k.startswith(wid)),
                 }
                 for wid, win in self.windows.items()
@@ -1836,6 +2233,17 @@ class ShutterEngine(DataUpdateCoordinator[None]):
 
 def _iso(value: date | datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
+
+
+def _split(state: str | None, tilt: bool) -> tuple[list[str | None], list[str | None]]:
+    """One contact state as the arguments of ``window_contact``."""
+    return ([], [state]) if tilt else ([state], [])
+
+
+def _int(value: Any) -> int | None:
+    """Optional position (empty = not set)."""
+    number = as_float(value)
+    return None if number is None else round(number)
 
 
 def _to_date(value: Any) -> date | None:

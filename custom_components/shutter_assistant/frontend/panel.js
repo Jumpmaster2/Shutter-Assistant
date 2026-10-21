@@ -3,7 +3,7 @@
 // WebSocket commands of the integration. Type, range, unit and domains of every
 // field come from the integration (the same selectors as in the dialogs).
 
-import { CHOICES, ERRORS, LABELS, STATUS } from "./labels.js";
+import { CHOICES, ERRORS, LABELS, NEXT_ACTION, STATUS } from "./labels.js";
 
 const UI = {
   de: {
@@ -25,6 +25,8 @@ const UI = {
       w_vent: ["Lüften & Urlaub", "Lüftungsposition beim Öffnen des Fensters und Teilnahme an der Urlaubssimulation."],
       w_morning: ["Morgenöffnung", "Nie bei Übersteuerung, Öffnungssperre oder einem seit dem Abend von Hand verstellten Rollo. Im Urlaub öffnet die Simulation."],
       w_conditions: ["Zusatzbedingungen", "Öffnungssperre (z. B. Fernseher an), Schließ-Auslöser und Fenster-Ausnahme."],
+      w_protection: ["Wetterschutz & Tür", "Positionen bei Wind und Regen, Spalt bei Frost und der Aussperrschutz einer Tür. Die Sensoren stehen unter Allgemein > Wetterschutz."],
+      protection: ["Wetterschutz", "Wind und Regen fahren die beteiligten Fenster auf ihre Schutzposition, auch bei Übersteuerung. Frost lässt beim Schließen einen Spalt. Die Positionen stehen am Fenster."],
       g_basics: ["Gruppe", "Eine Himmelsrichtung. Die Schwellen stehen am Fenster."],
       g_sensors: ["Sonnensensoren", "Jeder Sensor der Gruppe muss die Schwelle des Fensters erreichen."],
       compass: ["Sonnenkompass", "Aktueller Sonnenstand und die Bereiche der Gruppen."],
@@ -95,6 +97,9 @@ const UI = {
     position: "Position",
     open: "offen",
     closed: "zu",
+    tilted: "gekippt",
+    nextAction: "Nächste Aktion",
+    protections: { wind: "Windschutz", rain: "Regenschutz", frost: "Frostschutz" },
     unavailable: "nicht verfügbar",
     window: "Fenster",
     group: "Gruppe",
@@ -177,6 +182,8 @@ const UI = {
       w_vent: ["Ventilation & vacation", "Ventilation position when the window opens and taking part in the vacation simulation."],
       w_morning: ["Morning opening", "Never with an active override, an opening block or a cover moved by hand since the evening. During vacation the simulation opens instead."],
       w_conditions: ["Additional conditions", "Opening block (e.g. TV on), close trigger and window exception."],
+      w_protection: ["Weather protection & door", "Positions with wind and rain, a gap with frost and the lockout protection of a door. The sensors are under General > Weather protection."],
+      protection: ["Weather protection", "Wind and rain move the windows that take part to their protection position, also during an override. Frost keeps a gap when closing. The positions are set per window."],
       g_basics: ["Group", "A direction of the sun. Thresholds are set per window."],
       g_sensors: ["Sun sensors", "Every sensor of the group must reach the threshold of the window."],
       compass: ["Sun compass", "Current position of the sun and the sectors of the groups."],
@@ -247,6 +254,9 @@ const UI = {
     position: "Position",
     open: "open",
     closed: "closed",
+    tilted: "tilted",
+    nextAction: "Next action",
+    protections: { wind: "Wind protection", rain: "Rain protection", frost: "Frost protection" },
     unavailable: "unavailable",
     window: "Window",
     group: "Group",
@@ -327,7 +337,8 @@ const SETTINGS = {
     { id: "override", icon: "mdi:hand-back-right-outline", fields: ["override_trigger"] },
     { id: "summer", icon: "mdi:white-balance-sunny", fields: ["summer_threshold", "night_threshold", "heating_entity", "day_change_time", "forecast_type"] },
     { id: "startup", icon: "mdi:restart", fields: ["startup_delay", "catch_up_after"] },
-    { id: "advanced", icon: "mdi:cog-outline", fields: ["window_closed_delay", "show_panel"] },
+    { id: "protection", icon: "mdi:weather-windy", fields: ["wind_entity", "wind_threshold", "rain_entity", "rain_threshold", "frost_threshold", "protection_release"] },
+    { id: "advanced", icon: "mdi:cog-outline", fields: ["window_closed_delay", "command_interval", "verify_after", "show_panel"] },
     { id: "house", icon: "mdi:home-outline", fields: ["house_azimuth", "house_width", "house_depth"], preview: true },
   ],
   evening: [
@@ -354,7 +365,7 @@ const MORNING_MODE_FIELDS = {
 
 // Window editor: cards with the fields that apply for the current values
 const WINDOW_CARDS = [
-  { id: "w_basics", icon: "mdi:window-shutter-cog", fields: () => ["name", "cover", "window_sensors", "group", "wall", "wall_position"] },
+  { id: "w_basics", icon: "mdi:window-shutter-cog", fields: () => ["name", "cover", "window_sensors", "tilt_sensors", "group", "wall", "wall_position"] },
   {
     id: "w_sun",
     icon: "mdi:sun-angle-outline",
@@ -382,7 +393,7 @@ const WINDOW_CARDS = [
   {
     id: "w_evening",
     icon: "mdi:weather-night",
-    fields: (d) => ["evening_close", "follow_up_close", "evening_custom", ...(d.evening_custom ? ["evening_earliest", "evening_elevation", "evening_latest"] : [])],
+    fields: (d) => ["evening_close", "evening_position", "follow_up_close", "evening_custom", ...(d.evening_custom ? ["evening_earliest", "evening_elevation", "evening_latest"] : [])],
   },
   { id: "w_override", icon: "mdi:hand-back-right-outline", fields: () => ["override_duration", "override_sunrise_reset", "override_ignore_evening"] },
   {
@@ -414,6 +425,7 @@ const WINDOW_CARDS = [
     ],
   },
 ];
+WINDOW_CARDS.push({ id: "w_protection", icon: "mdi:weather-windy", fields: () => ["wind_position", "rain_position", "frost_position", "lockout_protection"] });
 const GROUP_CARDS = [
   { id: "g_basics", icon: "mdi:compass-outline", fields: () => ["name", "wall", "azimuth_from", "azimuth_to"] },
   { id: "g_sensors", icon: "mdi:weather-sunny", fields: () => ["radiation_sensors", "pv_sensors", "lux_sensors"] },
@@ -427,9 +439,10 @@ const WALLS = [
   ["back", 180],
   ["left", 270],
 ];
-const MARKER_COLORS = { sun_protection: "#ffa600", override: "#8e24aa", evening: "#5c6bc0", vacation: "#00897b" };
+const MARKER_COLORS = { protection: "#e53935", sun_protection: "#ffa600", override: "#8e24aa", evening: "#5c6bc0", vacation: "#00897b" };
 
 const STATUS_STYLE = {
+  protection: ["mdi:weather-windy", "danger"],
   off: ["mdi:pause-circle-outline", "muted"],
   startup: ["mdi:restart", "muted"],
   override: ["mdi:hand-back-right-outline", "purple"],
@@ -759,7 +772,7 @@ class ShutterAssistantPanel extends HTMLElement {
     const cfg = this._cfg;
     const ids = [...Object.values(cfg.entities || {}), "sun.sun", cfg.options.outdoor_temperature, ...(cfg.options.vacation_entities || [])];
     for (const win of this._windows) {
-      ids.push(...Object.values(win.entities || {}), win.data.cover, ...(win.data.window_sensors || []));
+      ids.push(...Object.values(win.entities || {}), win.data.cover, ...(win.data.window_sensors || []), ...(win.data.tilt_sensors || []));
     }
     for (const group of this._groups) {
       for (const [, sensors] of KINDS) ids.push(...(group.data[sensors] || []));
@@ -858,6 +871,10 @@ class ShutterAssistantPanel extends HTMLElement {
     return (win.data.window_sensors || []).some((id) => this._state(id)?.state !== "off");
   }
 
+  _windowTilted(win) {
+    return !!this._state(win.entities?.status)?.attributes?.window_tilted;
+  }
+
   // ------------------------------------------------------------------ overview
 
   _overview() {
@@ -900,6 +917,13 @@ class ShutterAssistantPanel extends HTMLElement {
       const vac = vacationIds.some((id) => this._state(id)?.state === "on");
       facts.push(["mdi:airplane", ui.vacation, vac ? ui.on : ui.off, vac ? "teal" : ""]);
     }
+    for (const [kind, icon] of [["wind", "mdi:weather-windy"], ["rain", "mdi:weather-pouring"], ["frost", "mdi:snowflake"]]) {
+      const guard = this._state(ent[`${kind}_protection`]);
+      if (!guard) continue;
+      const active = guard.state === "on";
+      const release = guard.attributes?.release_at;
+      facts.push([icon, ui.protections[kind], active ? (release ? ui.until(this._time(release)) : ui.on) : ui.off, active ? "danger" : ""]);
+    }
     const restart = auto?.attributes?.restart_protection_until;
     if (restart) facts.push(["mdi:restart", ui.restart, ui.until(this._time(restart)), "muted"]);
 
@@ -927,14 +951,14 @@ class ShutterAssistantPanel extends HTMLElement {
       for (const id of ids.filter(Boolean)) if (!exists(id)) hints.push(["mdi:alert-outline", ui.missing(where, id)]);
     };
     const o = cfg.options;
-    check(ui.global, [o.outdoor_temperature, o.weather, o.workday_entity, o.heating_entity, ...(o.vacation_entities || [])]);
+    check(ui.global, [o.outdoor_temperature, o.weather, o.workday_entity, o.heating_entity, o.wind_entity, o.rain_entity, ...(o.vacation_entities || [])]);
     for (const svc of o.notify_services || []) {
       if (!(cfg.notify_services || []).includes(svc)) hints.push(["mdi:alert-outline", ui.missing(ui.global, svc)]);
     }
     for (const group of this._groups) check(group.title, KINDS.flatMap(([, sensors]) => group.data[sensors] || []));
     for (const win of this._windows) {
       const d = win.data;
-      check(win.title, [d.cover, ...(d.window_sensors || []), d.room_entity, d.cooling_entity, d.open_block_entity, d.window_exception_entity, ...(d.close_trigger_entities || []), d.morning_enabled && d.morning_mode === "trigger" ? d.morning_trigger_entity : null]);
+      check(win.title, [d.cover, ...(d.window_sensors || []), ...(d.tilt_sensors || []), d.room_entity, d.cooling_entity, d.open_block_entity, d.window_exception_entity, ...(d.close_trigger_entities || []), d.morning_enabled && d.morning_mode === "trigger" ? d.morning_trigger_entity : null]);
       if (d.group && !this._group(d.group)) hints.push(["mdi:alert-outline", ui.missingGroup(win.title)]);
     }
     if (!o.weather && !o.outdoor_temperature) hints.push(["mdi:alert-outline", ui.noTemperature]);
@@ -955,6 +979,9 @@ class ShutterAssistantPanel extends HTMLElement {
     const position = this._position(win);
     const group = this._group(d.group);
     const open = this._windowOpen(win);
+    const tilted = this._windowTilted(win);
+    const next = this._state(win.entities?.next_action);
+    const nextText = next && !INVALID.includes(next.state) ? (NEXT_ACTION[this.lang] || NEXT_ACTION.en)[next.attributes.action] || "" : "";
     const override = this._state(win.entities?.override);
     const reason = this._state(win.entities?.last_reason);
     const reasonText = reason && !INVALID.includes(reason.state) ? reason.state : "";
@@ -971,7 +998,7 @@ class ShutterAssistantPanel extends HTMLElement {
         ${this._shutter(position)}
         <div class="tile-name">
           <div class="tile-title"><ha-icon icon="${icon}"></ha-icon>${esc(win.title)}</div>
-          <div class="muted small">${esc(position === null ? ui.unavailable : `${ui.position} ${position} %`)} · ${esc(ui.window)} ${esc(open ? ui.open : ui.closed)}</div>
+          <div class="muted small">${esc(position === null ? ui.unavailable : `${ui.position} ${position} %`)} · ${esc(ui.window)} ${esc(open ? ui.open : tilted ? ui.tilted : ui.closed)}</div>
         </div>
         ${this._statusPill(win)}
       </div>
@@ -979,6 +1006,7 @@ class ShutterAssistantPanel extends HTMLElement {
         <div class="row"><ha-icon icon="mdi:compass-outline" style="color:${group ? this._groupColor(group.id) : "var(--disabled-text-color)"}"></ha-icon>
           <span class="grow">${esc(ui.group)}</span><span class="muted">${esc(group ? group.title : ui.none)}</span></div>
         ${reasonText ? `<div class="row"><ha-icon icon="mdi:history"></ha-icon><span class="grow reason">${esc(reasonText)}</span><span class="muted">${esc(reasonTime)}</span></div>` : ""}
+        ${nextText ? `<div class="row"><ha-icon icon="mdi:clock-outline"></ha-icon><span class="grow">${esc(ui.nextAction)}: ${esc(nextText)}</span><span class="muted">${esc(this._time(next.state))}</span></div>` : ""}
         ${overrideRow}
       </div>
       ${expanded && group ? `<div class="check-wrap">${this._sunCheck(win)}</div>` : ""}
@@ -1900,6 +1928,8 @@ input:focus, select:focus, textarea:focus { outline:2px solid var(--primary-colo
 .center { text-align:center; }
 .used { margin-top:8px; }
 .pill { display:inline-block; border-radius:12px; padding:2px 10px; font-size:12px; background:var(--secondary-background-color, #eee); white-space:nowrap; }
+.pill.danger { background:rgba(229,57,53,.15); color:var(--error-color, #c62828); }
+.fact.danger ha-icon { color:var(--error-color, #c62828); }
 .pill.ok { background:rgba(67,160,71,.15); color:var(--success-color, #2e7d32); }
 .pill.warn { background:rgba(255,166,0,.18); color:var(--warning-color, #b26a00); }
 .pill.purple { background:rgba(142,36,170,.15); color:#8e24aa; }

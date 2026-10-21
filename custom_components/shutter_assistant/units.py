@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import (
+    CONF_FROST_THRESHOLD,
     CONF_NIGHT_THRESHOLD,
     CONF_ROOM_MARGIN,
     CONF_ROOM_THRESHOLD,
@@ -25,7 +26,7 @@ from .const import (
 
 CELSIUS = UnitOfTemperature.CELSIUS
 # Thresholds (absolute temperatures) and margins (temperature differences)
-GLOBAL_TEMPERATURES = (CONF_SUMMER_THRESHOLD, CONF_NIGHT_THRESHOLD)
+GLOBAL_TEMPERATURES = (CONF_SUMMER_THRESHOLD, CONF_NIGHT_THRESHOLD, CONF_FROST_THRESHOLD)
 WINDOW_TEMPERATURES = (CONF_TEMP_THRESHOLD, CONF_ROOM_THRESHOLD)
 WINDOW_INTERVALS = (CONF_ROOM_MARGIN,)
 

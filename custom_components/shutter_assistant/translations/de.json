@@ -81,6 +81,7 @@
           "summer": "Sommertag",
           "evening": "Abendmodus",
           "vacation": "Urlaubssimulation",
+          "protection": "Wetterschutz",
           "startup": "Neustart-Schutz",
           "advanced": "Erweitert"
         }
@@ -188,11 +189,35 @@
         "description": "Selten benötigte Einstellungen.",
         "data": {
           "window_closed_delay": "Fenster gilt als geschlossen nach",
+          "command_interval": "Abstand zwischen Fahrbefehlen",
+          "verify_after": "Position prüfen nach",
           "show_panel": "Dashboard in der Seitenleiste"
         },
         "data_description": {
           "window_closed_delay": "Ein Fensterkontakt muss so lange „zu“ melden, bevor Nachziehen, Sonnenschutz oder Schließ-Auslöser greifen (gegen Prellen beim Schließen).",
+          "command_interval": "Mehrere Rollos fahren nacheinander mit diesem Abstand (gegen Funkkollisionen). 0 = alle gleichzeitig.",
+          "verify_after": "Hat ein Rollo sein Ziel bis dahin nicht erreicht, wird der Befehl einmal wiederholt, danach kommt eine Meldung. 0 = aus.",
           "show_panel": "Aus: Das Dashboard verschwindet aus der Seitenleiste, bleibt aber über „Einstellungen“ bei der Integration erreichbar."
+        }
+      },
+      "protection": {
+        "title": "Wetterschutz",
+        "description": "Wind und Regen fahren die Rollos der beteiligten Fenster auf ihre Schutzposition, auch bei Übersteuerung und ausgeschalteter Automatik. Frost lässt beim Schließen einen Spalt. Die Positionen stehen am Fenster.",
+        "data": {
+          "wind_entity": "Windsensor",
+          "wind_threshold": "Windschutz ab",
+          "rain_entity": "Regensensor",
+          "rain_threshold": "Regenschutz über",
+          "frost_threshold": "Frost ab (höchstens)",
+          "protection_release": "Freigabe nach"
+        },
+        "data_description": {
+          "wind_entity": "Windgeschwindigkeit oder Böen, z. B. von einer Wetterstation.",
+          "wind_threshold": "In der Einheit des Windsensors (z. B. km/h oder m/s).",
+          "rain_entity": "Ein Regensensor, der einschaltet, oder eine Regenmenge (z. B. mm/h).",
+          "rain_threshold": "Nur bei einem Zahlenwert: Regen zählt über diesem Wert.",
+          "frost_threshold": "Außentemperatur. Nur Fenster mit einer Frostposition machen mit.",
+          "protection_release": "Ein Schutz endet erst, wenn der Wert so lange wieder im sicheren Bereich war. Ein nicht verfügbarer Sensor beendet nie einen Schutz."
         }
       }
     },
@@ -287,12 +312,14 @@
             "name": "Name",
             "cover": "Rollo",
             "window_sensors": "Fensterkontakte",
+            "tilt_sensors": "Kipp-Kontakte",
             "group": "Gruppe"
           },
           "data_description": {
             "name": "Wird auch für das Gerät und seine Entitäten verwendet.",
             "cover": "100 % = offen, 0 % = zu.",
-            "window_sensors": "'on' = offen. Unbekannt oder nicht verfügbar zählt als offen.",
+            "window_sensors": "'on' = offen. Fenstergriffe mit den Zuständen open, tilted und closed gehen auch. Unbekannt oder nicht verfügbar zählt als offen.",
+            "tilt_sensors": "'on' = gekippt. Solange das Fenster nur gekippt ist, schließen die Rollos höchstens bis zur Lüftungsposition.",
             "group": "Himmelsrichtung. Ohne Gruppe hat das Fenster keinen Sonnenschutz."
           }
         },
@@ -385,6 +412,7 @@
               "name": "Abend",
               "data": {
                 "evening_close": "Abendlauf",
+                "evening_position": "Abendposition",
                 "follow_up_close": "Nachziehen",
                 "evening_custom": "Eigene Abendzeiten",
                 "evening_earliest": "Abendmodus frühestens",
@@ -393,6 +421,7 @@
               },
               "data_description": {
                 "evening_close": "Zu Beginn des Abendmodus schließen, einmal pro Abend und nur bei geschlossenem Fenster.",
+                "evening_position": "Ziel des Abendlaufs und des Nachziehens. 0 % = zu; z. B. 20 % lässt in warmen Nächten einen Spalt.",
                 "follow_up_close": "Wird das Fenster am Abend geschlossen, fährt das Rollo zu (auch bei Übersteuerung).",
                 "evening_custom": "Die folgenden Werte statt der globalen verwenden.",
                 "evening_earliest": "Vor dieser Uhrzeit beginnt der Abendmodus nie.",
@@ -417,6 +446,21 @@
                 "vacation": "An der zufälligen Öffnung und Schließung im Urlaub teilnehmen.",
                 "ventilation_position": "Position beim Lüften (100 % = offen).",
                 "ventilation_delay_evening": "Im Abendmodus fährt das Rollo nach dieser kurzen Zeit auf die Lüftungsposition."
+              }
+            },
+            "protection": {
+              "name": "Wetterschutz & Tür",
+              "data": {
+                "wind_position": "Position bei Wind",
+                "rain_position": "Position bei Regen",
+                "frost_position": "Tiefste Position bei Frost",
+                "lockout_protection": "Aussperrschutz (Tür)"
+              },
+              "data_description": {
+                "wind_position": "Leer = nicht betroffen. Z. B. 100 % fährt Raffstores hoch.",
+                "rain_position": "Leer = nicht betroffen. Z. B. 0 % für ein Dachfenster.",
+                "frost_position": "Leer = aus. Bei Frost stoppt das Schließen hier, damit das Rollo nicht anfriert, z. B. 5 %.",
+                "lockout_protection": "Solange der Kontakt offen meldet, fährt nichts unter die Lüftungsposition, auch nicht mit Fenster-Ausnahme oder Wetterschutz."
               }
             }
           }
@@ -561,6 +605,16 @@
         "twice_daily": "Zweimal täglich",
         "hourly": "Stündlich"
       }
+    },
+    "service_action": {
+      "options": {
+        "open": "Öffnen",
+        "close": "Schließen",
+        "evening": "Abendposition",
+        "sun_protection": "Sonnenschutz-Position",
+        "ventilation": "Lüftungsposition",
+        "position": "Position"
+      }
     }
   },
   "entity": {
@@ -582,6 +636,15 @@
       },
       "evening_closed": {
         "name": "Abends geschlossen"
+      },
+      "wind_protection": {
+        "name": "Windschutz"
+      },
+      "rain_protection": {
+        "name": "Regenschutz"
+      },
+      "frost_protection": {
+        "name": "Frostschutz"
       }
     },
     "sensor": {
@@ -597,16 +660,39 @@
           "evening": "Abends geschlossen",
           "sun_protection": "Sonnenschutz",
           "vacation": "Urlaubssimulation",
-          "ready": "Bereit"
+          "ready": "Bereit",
+          "protection": "Wetterschutz"
         }
       },
       "last_reason": {
         "name": "Letzter Grund"
+      },
+      "next_action": {
+        "name": "Nächste Aktion",
+        "state_attributes": {
+          "action": {
+            "name": "Aktion",
+            "state": {
+              "evening": "Abendlauf",
+              "morning": "Morgenöffnung",
+              "override_end": "Ende der Übersteuerung",
+              "sun_enter": "Sonne kommt in den Bereich",
+              "sun_leave": "Sonne verlässt den Bereich",
+              "protection_end": "Wetterschutz kann enden"
+            }
+          }
+        }
       }
     },
     "switch": {
       "automatic": {
         "name": "Automatik"
+      },
+      "window_automatic": {
+        "name": "Automatik"
+      },
+      "window_sun_protection": {
+        "name": "Sonnenschutz"
       }
     }
   },
@@ -618,6 +704,71 @@
     "forecast_unsupported": {
       "title": "Wetter-Entität liefert keine Vorhersage",
       "description": "{weather} unterstützt keine der Vorhersage-Arten täglich, zweimal täglich oder stündlich. Der Sommertag beginnt dann nur über die Außentemperatur. Bitte in den Einstellungen von Shutter Assistant eine andere Wetter-Entität wählen."
+    }
+  },
+  "services": {
+    "move": {
+      "name": "Fahren",
+      "description": "Fährt Fenster von Shutter Assistant, ohne eine Übersteuerung zu starten. Frost- und Aussperrschutz gelten weiter.",
+      "fields": {
+        "entity_id": {
+          "name": "Rollos",
+          "description": "Rollos konfigurierter Fenster. Leer = alle Fenster."
+        },
+        "action": {
+          "name": "Aktion",
+          "description": "Abend und Sonnenschutz nutzen die Positionen des Fensters und werden vorgemerkt wie die Fahrten der Automatik."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Nur für die Aktion „Position“ (100 % = offen)."
+        }
+      }
+    },
+    "start_override": {
+      "name": "Übersteuerung starten",
+      "description": "Pausiert die Automatik von Fenstern wie eine Fahrt von Hand.",
+      "fields": {
+        "entity_id": {
+          "name": "Rollos",
+          "description": "Rollos konfigurierter Fenster. Leer = alle Fenster."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Leer = die Dauer des Fensters. 0 = bis Sonnenaufgang."
+        }
+      }
+    },
+    "end_override": {
+      "name": "Übersteuerung beenden",
+      "description": "Beendet eine laufende Übersteuerung; die Automatik entscheidet beim nächsten Anlass.",
+      "fields": {
+        "entity_id": {
+          "name": "Rollos",
+          "description": "Rollos konfigurierter Fenster. Leer = alle Fenster."
+        }
+      }
+    },
+    "resume": {
+      "name": "Automatik fortsetzen",
+      "description": "Beendet eine Übersteuerung und lässt die Automatik sofort entscheiden (Sonnenschutz, Abendlauf).",
+      "fields": {
+        "entity_id": {
+          "name": "Rollos",
+          "description": "Rollos konfigurierter Fenster. Leer = alle Fenster."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Shutter Assistant ist nicht geladen."
+    },
+    "unknown_cover": {
+      "message": "{entity_id} gehört zu keinem Fenster von Shutter Assistant."
+    },
+    "position_required": {
+      "message": "Die Aktion „Position“ braucht eine Position."
     }
   }
 }
