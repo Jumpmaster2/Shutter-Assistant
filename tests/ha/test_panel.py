@@ -18,9 +18,12 @@ async def test_panel_registered_as_configure_page(hass: HomeAssistant, base_stat
     with (
         patch("homeassistant.components.frontend.async_panel_exists", return_value=False),
         patch("homeassistant.components.panel_custom.async_register_panel") as register,
+        patch("homeassistant.components.frontend.add_extra_js_url") as add_js,
     ):
         await setup_entry(hass, make_entry())
 
+    # the dashboard card is loaded for every user
+    assert add_js.call_args.args[1].startswith("/shutter_assistant_static/card.js?v=")
     kwargs = register.call_args.kwargs
     # the configure button of the integration opens the panel
     assert kwargs["config_panel_domain"] == DOMAIN
@@ -33,6 +36,7 @@ async def test_panel_registered_as_configure_page(hass: HomeAssistant, base_stat
     assert static.url_path == "/shutter_assistant_static"
     assert (Path(static.path) / "panel.js").is_file()
     assert (Path(static.path) / "labels.js").is_file()
+    assert (Path(static.path) / "card.js").is_file()
 
 
 async def test_no_panel_without_frontend(hass: HomeAssistant, base_states) -> None:

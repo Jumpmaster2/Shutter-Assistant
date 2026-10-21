@@ -161,8 +161,11 @@ async def test_panel_without_sidebar(hass: HomeAssistant, base_states) -> None:
     with (
         patch("homeassistant.components.frontend.async_panel_exists", return_value=False),
         patch("homeassistant.components.panel_custom.async_register_panel") as register,
+        patch("homeassistant.components.frontend.add_extra_js_url") as add_js,
     ):
         await setup_entry(hass, make_entry(show_panel=False))
+    # the card is there also without the sidebar entry
+    add_js.assert_called_once()
     kwargs = register.call_args.kwargs
     assert kwargs["sidebar_title"] is None
     assert kwargs["config_panel_domain"] == DOMAIN
