@@ -81,6 +81,7 @@
           "summer": "Summer day",
           "evening": "Evening mode",
           "vacation": "Vacation simulation",
+          "protection": "Weather protection",
           "startup": "Restart protection",
           "advanced": "Advanced"
         }
@@ -188,11 +189,35 @@
         "description": "Settings that are rarely needed.",
         "data": {
           "window_closed_delay": "Window counts as closed after",
+          "command_interval": "Spacing between cover commands",
+          "verify_after": "Check the position after",
           "show_panel": "Dashboard in the sidebar"
         },
         "data_description": {
           "window_closed_delay": "A window contact must report closed this long before closing after the window, sun protection or the close trigger act (against bouncing contacts).",
+          "command_interval": "Several covers move one after the other with this spacing (against radio collisions). 0 = all at once.",
+          "verify_after": "If a cover has not reached its target by then, the command is repeated once; then a notification is sent. 0 = off.",
           "show_panel": "Off: the dashboard disappears from the sidebar but stays reachable with \"Configure\" at the integration."
+        }
+      },
+      "protection": {
+        "title": "Weather protection",
+        "description": "Wind and rain move the covers of the windows that take part to their protection position, also during an override and with the automatic off. Frost keeps a gap when closing. Positions are set per window.",
+        "data": {
+          "wind_entity": "Wind sensor",
+          "wind_threshold": "Wind protection from",
+          "rain_entity": "Rain sensor",
+          "rain_threshold": "Rain protection above",
+          "frost_threshold": "Frost at or below",
+          "protection_release": "Release after"
+        },
+        "data_description": {
+          "wind_entity": "Wind speed or gusts, e.g. from a weather station.",
+          "wind_threshold": "In the unit of the wind sensor (e.g. km/h or m/s).",
+          "rain_entity": "A rain sensor that turns on, or an amount of rain (e.g. mm/h).",
+          "rain_threshold": "Only for a numeric rain sensor: rain counts above this value.",
+          "frost_threshold": "Outdoor temperature. Only windows with a frost position take part.",
+          "protection_release": "A protection ends only after the value stayed on the safe side this long. An unavailable sensor never ends a protection."
         }
       }
     },
@@ -287,12 +312,14 @@
             "name": "Name",
             "cover": "Cover",
             "window_sensors": "Window contacts",
+            "tilt_sensors": "Tilt contacts",
             "group": "Group"
           },
           "data_description": {
             "name": "Also used for the device and its entities.",
             "cover": "100 % = open, 0 % = closed.",
-            "window_sensors": "'on' = open. Unknown or unavailable counts as open.",
+            "window_sensors": "'on' = open. Window handles with the states open, tilted and closed work as well. Unknown or unavailable counts as open.",
+            "tilt_sensors": "'on' = tilted. While the window is only tilted, covers close no further than the ventilation position.",
             "group": "Direction of the sun. Without a group the window has no sun protection."
           }
         },
@@ -419,6 +446,21 @@
                 "vacation": "Take part in the random opening and closing during vacation.",
                 "ventilation_position": "Position for ventilation (100 % = open).",
                 "ventilation_delay_evening": "In the evening mode the cover moves to the ventilation position after this short time."
+              }
+            },
+            "protection": {
+              "name": "Weather protection & door",
+              "data": {
+                "wind_position": "Position with wind",
+                "rain_position": "Position with rain",
+                "frost_position": "Lowest position with frost",
+                "lockout_protection": "Lockout protection (door)"
+              },
+              "data_description": {
+                "wind_position": "Empty = not affected. E.g. 100 % retracts external venetian blinds.",
+                "rain_position": "Empty = not affected. E.g. 0 % for a roof window shutter.",
+                "frost_position": "Empty = off. With frost, closing stops at this position so the cover cannot freeze on, e.g. 5 %.",
+                "lockout_protection": "While the contact reports open, nothing closes below the ventilation position, also not with the window exception or the weather protection."
               }
             }
           }
@@ -584,6 +626,15 @@
       },
       "evening_closed": {
         "name": "Closed this evening"
+      },
+      "wind_protection": {
+        "name": "Wind protection"
+      },
+      "rain_protection": {
+        "name": "Rain protection"
+      },
+      "frost_protection": {
+        "name": "Frost protection"
       }
     },
     "sensor": {
@@ -599,16 +650,39 @@
           "evening": "Closed for the evening",
           "sun_protection": "Sun protection",
           "vacation": "Vacation simulation",
-          "ready": "Ready"
+          "ready": "Ready",
+          "protection": "Weather protection"
         }
       },
       "last_reason": {
         "name": "Last reason"
+      },
+      "next_action": {
+        "name": "Next action",
+        "state_attributes": {
+          "action": {
+            "name": "Action",
+            "state": {
+              "evening": "Evening run",
+              "morning": "Morning opening",
+              "override_end": "End of the override",
+              "sun_enter": "Sun enters the sector",
+              "sun_leave": "Sun leaves the sector",
+              "protection_end": "Weather protection may end"
+            }
+          }
+        }
       }
     },
     "switch": {
       "automatic": {
         "name": "Automatic"
+      },
+      "window_automatic": {
+        "name": "Automatic"
+      },
+      "window_sun_protection": {
+        "name": "Sun protection"
       }
     }
   },

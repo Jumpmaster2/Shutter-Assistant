@@ -306,3 +306,85 @@ def test_no_notification_for_an_unavailable_contact() -> None:
     s = replace(SUNNY, window_open=True, window_on=False)
     assert w.sun(RULES, s) == []
     assert kinds(w.sun(RULES, replace(s, window_on=True))) == [(w.NOTIFY, w.R_SUN_BLOCKED, None)]
+
+
+# ---------------------------------------------------------------- weather protection
+
+
+def test_protection_kind_wind_before_rain() -> None:
+    rules = replace(RULES, wind_position=100, rain_position=0)
+    assert w.protection_kind(rules, {"wind", "rain"}) == "wind"
+    assert w.protection_kind(rules, {"rain"}) == "rain"
+    # a window without a position is not affected
+    assert w.protection_kind(RULES, {"wind", "rain"}) is None
+    assert w.protection_kind(replace(RULES, rain_position=0), {"wind", "rain"}) == "rain"
+
+
+def test_protect_also_with_override_and_automatic_off() -> None:
+    rules = replace(RULES, wind_position=100)
+    s = Situation(position=10, protection="wind", override=True, automatic=False)
+    assert kinds(w.protect(rules, s)) == [(w.POSITION, w.R_PROTECT_WIND, 100)]
+    assert w.protect(rules, replace(s, position=100)) == []
+    assert w.protect(rules, replace(s, startup=True)) == []
+    assert w.protect(rules, replace(s, protection=None)) == []
+
+
+def test_protect_rain_does_not_close_an_open_window() -> None:
+    rules = replace(RULES, rain_position=0)
+    s = Situation(position=100, protection="rain")
+    assert kinds(w.protect(rules, s)) == [(w.POSITION, w.R_PROTECT_RAIN, 0)]
+    assert w.protect(rules, replace(s, window_open=True)) == []
+    assert w.protect(rules, replace(s, window_open=True, window_exception=True))
+
+
+def test_running_protection_suspends_the_other_rules() -> None:
+    s = replace(SUNNY, protection="wind")
+    assert w.sun(RULES, s) == []
+    assert w.evening(RULES, replace(EVENING, protection="rain")) == []
+    assert w.status(RULES, s) == w.S_PROTECTION
+    assert w.status(RULES, replace(s, automatic=False)) == w.S_PROTECTION
+
+
+def test_sun_switch_off_does_not_lower_but_opens_again() -> None:
+    assert w.sun(RULES, replace(SUNNY, sun_enabled=False)) == []
+    done = Situation(position=10, sun_marker=True, past_sector_end=True, sun_enabled=False)
+    assert kinds(w.sun(RULES, done))[0] == (w.POSITION, w.R_AUTO_UP, 100)
+
+
+# ---------------------------------------------------------------- limits: frost, tilted, door
+
+
+def test_frost_keeps_a_gap_except_for_protection() -> None:
+    rules = replace(RULES, frost_position=5)
+    s = Situation(position=100, frost=True)
+    assert w.limit_target(rules, s, 0) == 5
+    assert w.limit_target(rules, s, 0, protective=True) == 0
+    assert w.limit_target(rules, replace(s, frost=False), 0) == 0
+    assert w.limit_target(RULES, s, 0) == 0
+    # opening is never limited
+    assert w.limit_target(rules, replace(s, position=0), 100) == 100
+    # a cover already below the gap is not opened by a closing move
+    assert w.limit_target(rules, replace(s, position=3), 0) is None
+
+
+def test_tilted_window_closes_to_the_ventilation_position() -> None:
+    s = Situation(position=100, window_tilted=True)
+    assert w.limit_target(RULES, s, 0) == 30
+    assert w.limit_target(RULES, s, 50) == 50
+    assert w.limit_target(RULES, replace(s, position=30), 0) is None
+    # a tilted window does not block the evening run
+    assert w.evening(RULES, replace(EVENING, window_tilted=True))
+
+
+def test_ventilation_also_when_tilted() -> None:
+    s = Situation(position=0, window_tilted=True)
+    assert kinds(w.ventilation(RULES, s)) == [(w.POSITION, w.R_VENTILATION, 30)]
+
+
+def test_lockout_keeps_an_open_door_free_also_for_protection() -> None:
+    rules = replace(RULES, lockout=True)
+    s = Situation(position=100, window_open=True, window_exception=True)
+    assert w.limit_target(rules, s, 0) == 30
+    assert w.limit_target(rules, s, 0, protective=True) == 30
+    assert w.limit_target(RULES, s, 0) == 0
+    assert w.limit_target(rules, replace(s, window_open=False), 0) == 0

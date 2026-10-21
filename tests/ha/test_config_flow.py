@@ -205,6 +205,7 @@ async def test_window_subentry_with_group_and_morning(hass: HomeAssistant, base_
                 "ventilation_delay_day": 60,
                 "vacation": True,
             },
+            "protection": {"wind_position": 100, "lockout_protection": True},
         },
     )
     assert result["step_id"] == "morning"
@@ -232,6 +233,9 @@ async def test_window_subentry_with_group_and_morning(hass: HomeAssistant, base_
     assert sub.data["morning_time_workday"] == "06:45:00"
     assert sub.data["override_duration"] == 60
     assert "open_block_entity" not in sub.data
+    assert sub.data["wind_position"] == 100
+    assert sub.data["lockout_protection"] is True
+    assert "rain_position" not in sub.data
 
 
 async def test_window_without_group_skips_sun(hass: HomeAssistant, base_states) -> None:

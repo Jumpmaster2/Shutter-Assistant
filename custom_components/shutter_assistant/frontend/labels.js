@@ -45,6 +45,10 @@ export const LABELS = {
    "Gilt als geschlossen bis",
    "Für Lüften und Urlaub morgens."
   ],
+  "command_interval": [
+   "Abstand zwischen Fahrbefehlen",
+   "Mehrere Rollos fahren nacheinander mit diesem Abstand (gegen Funkkollisionen). 0 = alle gleichzeitig."
+  ],
   "cooling_entity": [
    "Klimaanlage",
    "Optional: Solange diese Klimaanlage kühlt, gilt der Raum als zu warm. Der Sonnenschutz entlastet dann die Klimaanlage."
@@ -93,6 +97,14 @@ export const LABELS = {
    "Vorhersage-Art",
    "Automatisch nimmt die erste Art, die die Wetter-Entität kann (täglich, zweimal täglich, stündlich). Aus stündlichen Werten werden Tageshöchst- und Nachttiefstwert berechnet."
   ],
+  "frost_position": [
+   "Tiefste Position bei Frost",
+   "Leer = aus. Bei Frost stoppt das Schließen hier, damit das Rollo nicht anfriert, z. B. 5 %."
+  ],
+  "frost_threshold": [
+   "Frost ab (höchstens)",
+   "Außentemperatur. Nur Fenster mit einer Frostposition machen mit."
+  ],
   "group": [
    "Gruppe",
    "Himmelsrichtung. Ohne Gruppe hat das Fenster keinen Sonnenschutz."
@@ -104,6 +116,10 @@ export const LABELS = {
   "language": [
    "Sprache der Meldungen",
    "Logbuch, letzter Grund und Push-Nachrichten."
+  ],
+  "lockout_protection": [
+   "Aussperrschutz (Tür)",
+   "Solange der Kontakt offen meldet, fährt nichts unter die Lüftungsposition, auch nicht mit Fenster-Ausnahme oder Wetterschutz."
   ],
   "lux_sensors": [
    "Helligkeitssensoren",
@@ -241,6 +257,10 @@ export const LABELS = {
    "Toleranz für Auto-Hoch",
    "Auto-Hoch öffnet nur Rollos, die auf der Sonnenschutz-Position bis so viel darüber stehen. Von Hand anders gestellte Rollos bleiben."
   ],
+  "protection_release": [
+   "Freigabe nach",
+   "Ein Schutz endet erst, wenn der Wert so lange wieder im sicheren Bereich war. Ein nicht verfügbarer Sensor beendet nie einen Schutz."
+  ],
   "pv_sensors": [
    "PV-Leistungssensoren",
    "Leistung einer PV-Anlage oder eines Moduls in diese Richtung (W)."
@@ -256,6 +276,18 @@ export const LABELS = {
   "radiation_threshold": [
    "Strahlungsschwelle",
    "Jeder Strahlungssensor der Gruppe muss diesen Wert erreichen."
+  ],
+  "rain_entity": [
+   "Regensensor",
+   "Ein Regensensor, der einschaltet, oder eine Regenmenge (z. B. mm/h)."
+  ],
+  "rain_position": [
+   "Position bei Regen",
+   "Leer = nicht betroffen. Z. B. 0 % für ein Dachfenster."
+  ],
+  "rain_threshold": [
+   "Regenschutz über",
+   "Nur bei einem Zahlenwert: Regen zählt über diesem Wert."
   ],
   "room_entity": [
    "Raumtemperatur",
@@ -296,6 +328,10 @@ export const LABELS = {
   "temperature_threshold": [
    "Außentemperatur mindestens",
    "Sonnenschutz erst ab dieser Außentemperatur."
+  ],
+  "tilt_sensors": [
+   "Kipp-Kontakte",
+   "'on' = gekippt. Solange das Fenster nur gekippt ist, schließen die Rollos höchstens bis zur Lüftungsposition."
   ],
   "vacation": [
    "Urlaubssimulation",
@@ -345,6 +381,10 @@ export const LABELS = {
    "Lüftungsposition",
    "Position beim Lüften (100 % = offen)."
   ],
+  "verify_after": [
+   "Position prüfen nach",
+   "Hat ein Rollo sein Ziel bis dahin nicht erreicht, wird der Befehl einmal wiederholt, danach kommt eine Meldung. 0 = aus."
+  ],
   "weather": [
    "Wetter-Entität",
    "Ihre Tagesvorhersage entscheidet beim Tageswechsel, ob heute ein Sommertag ist."
@@ -352,6 +392,18 @@ export const LABELS = {
   "weekend_days": [
    "Wochenendtage",
    "Nur ohne Werktag-Sensor: an diesen Tagen gilt die Wochenend-Uhrzeit der Morgenöffnung."
+  ],
+  "wind_entity": [
+   "Windsensor",
+   "Windgeschwindigkeit oder Böen, z. B. von einer Wetterstation."
+  ],
+  "wind_position": [
+   "Position bei Wind",
+   "Leer = nicht betroffen. Z. B. 100 % fährt Raffstores hoch."
+  ],
+  "wind_threshold": [
+   "Windschutz ab",
+   "In der Einheit des Windsensors (z. B. km/h oder m/s)."
   ],
   "window_closed_delay": [
    "Fenster gilt als geschlossen nach",
@@ -363,7 +415,7 @@ export const LABELS = {
   ],
   "window_sensors": [
    "Fensterkontakte",
-   "'on' = offen. Unbekannt oder nicht verfügbar zählt als offen."
+   "'on' = offen. Fenstergriffe mit den Zuständen open, tilted und closed gehen auch. Unbekannt oder nicht verfügbar zählt als offen."
   ],
   "workday_entity": [
    "Werktag-Sensor",
@@ -415,6 +467,10 @@ export const LABELS = {
    "Counts as closed up to",
    "Used for ventilation and the vacation morning."
   ],
+  "command_interval": [
+   "Spacing between cover commands",
+   "Several covers move one after the other with this spacing (against radio collisions). 0 = all at once."
+  ],
   "cooling_entity": [
    "Air conditioner",
    "Optional: while this air conditioner cools, the room counts as too warm. Sun protection then takes load off the air conditioner."
@@ -463,6 +519,14 @@ export const LABELS = {
    "Kind of forecast",
    "Automatic takes the first kind the weather entity supports (daily, twice daily, hourly). From hourly values the high of the day and the low of the night are calculated."
   ],
+  "frost_position": [
+   "Lowest position with frost",
+   "Empty = off. With frost, closing stops at this position so the cover cannot freeze on, e.g. 5 %."
+  ],
+  "frost_threshold": [
+   "Frost at or below",
+   "Outdoor temperature. Only windows with a frost position take part."
+  ],
   "group": [
    "Group",
    "Direction of the sun. Without a group the window has no sun protection."
@@ -474,6 +538,10 @@ export const LABELS = {
   "language": [
    "Language of messages",
    "Logbook, last reason and push messages."
+  ],
+  "lockout_protection": [
+   "Lockout protection (door)",
+   "While the contact reports open, nothing closes below the ventilation position, also not with the window exception or the weather protection."
   ],
   "lux_sensors": [
    "Brightness sensors",
@@ -611,6 +679,10 @@ export const LABELS = {
    "Tolerance for auto up",
    "Auto up only opens covers standing at the sun protection position up to this much above it. Covers moved elsewhere by hand stay."
   ],
+  "protection_release": [
+   "Release after",
+   "A protection ends only after the value stayed on the safe side this long. An unavailable sensor never ends a protection."
+  ],
   "pv_sensors": [
    "PV power sensors",
    "Power of a solar system or panel facing this direction (W)."
@@ -626,6 +698,18 @@ export const LABELS = {
   "radiation_threshold": [
    "Radiation threshold",
    "Every radiation sensor of the group must reach this value."
+  ],
+  "rain_entity": [
+   "Rain sensor",
+   "A rain sensor that turns on, or an amount of rain (e.g. mm/h)."
+  ],
+  "rain_position": [
+   "Position with rain",
+   "Empty = not affected. E.g. 0 % for a roof window shutter."
+  ],
+  "rain_threshold": [
+   "Rain protection above",
+   "Only for a numeric rain sensor: rain counts above this value."
   ],
   "room_entity": [
    "Room temperature",
@@ -666,6 +750,10 @@ export const LABELS = {
   "temperature_threshold": [
    "Outdoor temperature at least",
    "Sun protection only from this outdoor temperature on."
+  ],
+  "tilt_sensors": [
+   "Tilt contacts",
+   "'on' = tilted. While the window is only tilted, covers close no further than the ventilation position."
   ],
   "vacation": [
    "Vacation simulation",
@@ -715,6 +803,10 @@ export const LABELS = {
    "Ventilation position",
    "Position for ventilation (100 % = open)."
   ],
+  "verify_after": [
+   "Check the position after",
+   "If a cover has not reached its target by then, the command is repeated once; then a notification is sent. 0 = off."
+  ],
   "weather": [
    "Weather entity",
    "Its daily forecast decides at the day change whether today is a summer day."
@@ -722,6 +814,18 @@ export const LABELS = {
   "weekend_days": [
    "Weekend days",
    "Only without a workday sensor: on these days the weekend time of the morning opening applies."
+  ],
+  "wind_entity": [
+   "Wind sensor",
+   "Wind speed or gusts, e.g. from a weather station."
+  ],
+  "wind_position": [
+   "Position with wind",
+   "Empty = not affected. E.g. 100 % retracts external venetian blinds."
+  ],
+  "wind_threshold": [
+   "Wind protection from",
+   "In the unit of the wind sensor (e.g. km/h or m/s)."
   ],
   "window_closed_delay": [
    "Window counts as closed after",
@@ -733,7 +837,7 @@ export const LABELS = {
   ],
   "window_sensors": [
    "Window contacts",
-   "'on' = open. Unknown or unavailable counts as open."
+   "'on' = open. Window handles with the states open, tilted and closed work as well. Unknown or unavailable counts as open."
   ],
   "workday_entity": [
    "Workday sensor",
@@ -849,7 +953,8 @@ export const STATUS = {
   "evening": "Abends geschlossen",
   "sun_protection": "Sonnenschutz",
   "vacation": "Urlaubssimulation",
-  "ready": "Bereit"
+  "ready": "Bereit",
+  "protection": "Wetterschutz"
  },
  "en": {
   "off": "Automatic off",
@@ -858,6 +963,25 @@ export const STATUS = {
   "evening": "Closed for the evening",
   "sun_protection": "Sun protection",
   "vacation": "Vacation simulation",
-  "ready": "Ready"
+  "ready": "Ready",
+  "protection": "Weather protection"
+ }
+};
+export const NEXT_ACTION = {
+ "de": {
+  "evening": "Abendlauf",
+  "morning": "Morgenöffnung",
+  "override_end": "Ende der Übersteuerung",
+  "sun_enter": "Sonne kommt in den Bereich",
+  "sun_leave": "Sonne verlässt den Bereich",
+  "protection_end": "Wetterschutz kann enden"
+ },
+ "en": {
+  "evening": "Evening run",
+  "morning": "Morning opening",
+  "override_end": "End of the override",
+  "sun_enter": "Sun enters the sector",
+  "sun_leave": "Sun leaves the sector",
+  "protection_end": "Weather protection may end"
  }
 };

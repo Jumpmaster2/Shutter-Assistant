@@ -17,6 +17,10 @@ SUBENTRY_GROUP: Final = "group"
 SUBENTRY_WINDOW: Final = "window"
 STORAGE_VERSION: Final = 1
 EVENT_LOGBOOK: Final = f"{DOMAIN}_logbook"
+# Events for own automations
+EVENT_COVER_MOVED: Final = f"{DOMAIN}_cover_moved"
+EVENT_COVER_FAILED: Final = f"{DOMAIN}_cover_failed"
+EVENT_PROTECTION: Final = f"{DOMAIN}_protection"
 
 # Window contacts are debounced before they count as closed (default, seconds).
 CONF_WINDOW_DEBOUNCE = "window_closed_delay"
@@ -73,6 +77,19 @@ TRIGGER_MOVEMENT = "movement"
 TRIGGER_COMMAND = "command"
 OVERRIDE_TRIGGERS: Final = [TRIGGER_MOVEMENT, TRIGGER_COMMAND]
 
+# Weather protection: wind and rain move covers to a protection position, frost
+# keeps a gap when closing. Each ends only after the release time.
+CONF_WIND_ENTITY = "wind_entity"
+CONF_WIND_THRESHOLD = "wind_threshold"
+CONF_RAIN_ENTITY = "rain_entity"
+CONF_RAIN_THRESHOLD = "rain_threshold"
+CONF_FROST_THRESHOLD = "frost_threshold"
+CONF_PROTECTION_RELEASE = "protection_release"
+# Spacing between two cover commands (s, 0 = off) and the check whether a
+# cover reached its target (s after the command, 0 = off).
+CONF_COMMAND_INTERVAL = "command_interval"
+CONF_VERIFY_AFTER = "verify_after"
+
 LANGUAGE_OPTIONS: Final = ["auto", "de", "en"]
 
 DEFAULTS: Final[dict[str, object]] = {
@@ -100,6 +117,12 @@ DEFAULTS: Final[dict[str, object]] = {
     CONF_OVERRIDE_TRIGGER: TRIGGER_MOVEMENT,
     CONF_WINDOW_DEBOUNCE: 5,
     CONF_SHOW_PANEL: True,
+    CONF_WIND_THRESHOLD: 50.0,
+    CONF_RAIN_THRESHOLD: 0.0,
+    CONF_FROST_THRESHOLD: 1.0,
+    CONF_PROTECTION_RELEASE: 15,
+    CONF_COMMAND_INTERVAL: 0,
+    CONF_VERIFY_AFTER: 90,
 }
 
 # ---------- house (only in the panel: drawn in the sun compass) ----------
@@ -142,6 +165,14 @@ GROUP_DEFAULTS: Final[dict[str, object]] = {
 CONF_COVER = "cover"
 CONF_WINDOW_SENSORS = "window_sensors"
 CONF_GROUP = "group"
+# Contacts that mean "tilted" (window handles with open/tilted/closed also work
+# as window contacts) and the lockout protection of doors.
+CONF_TILT_SENSORS = "tilt_sensors"
+CONF_LOCKOUT = "lockout_protection"
+# Weather protection per window (empty = not affected / off).
+CONF_WIND_POSITION = "wind_position"
+CONF_RAIN_POSITION = "rain_position"
+CONF_FROST_POSITION = "frost_position"
 
 CONF_PV_THRESHOLD = "pv_threshold"
 CONF_LUX_THRESHOLD = "lux_threshold"
@@ -218,6 +249,8 @@ ACTIVE_STATES_DEFAULT: Final = ["on", "idle", "paused", "playing"]
 
 WINDOW_DEFAULTS: Final[dict[str, object]] = {
     CONF_WINDOW_SENSORS: [],
+    CONF_TILT_SENSORS: [],
+    CONF_LOCKOUT: False,
     CONF_PV_THRESHOLD: 130.0,
     CONF_LUX_THRESHOLD: 14500.0,
     CONF_RADIATION_THRESHOLD: 150.0,
@@ -274,3 +307,4 @@ SECTION_OVERRIDE = "override"
 SECTION_CONDITIONS = "conditions"
 SECTION_EVENING = "evening"
 SECTION_VENTILATION = "ventilation_settings"
+SECTION_PROTECTION = "protection"

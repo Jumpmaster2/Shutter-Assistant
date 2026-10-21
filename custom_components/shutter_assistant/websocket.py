@@ -26,6 +26,7 @@ from .config_flow import (
     _notify_services,
     _number,
     _override_schema,
+    _protection_schema,
     _startup_schema,
     _summer_schema,
     _time_key,
@@ -42,6 +43,7 @@ from .config_flow import (
     window_morning_fields,
     window_morning_mode_fields,
     window_override_fields,
+    window_protection_fields,
     window_sun_fields,
     window_ventilation_fields,
 )
@@ -52,6 +54,7 @@ from .const import (
     CONF_EVENING_EARLIEST,
     CONF_EVENING_ELEVATION,
     CONF_EVENING_LATEST,
+    CONF_FROST_POSITION,
     CONF_GROUP,
     CONF_HEATING_ENTITY,
     CONF_HOUSE_AZIMUTH,
@@ -63,10 +66,14 @@ from .const import (
     CONF_NAME,
     CONF_OPEN_BLOCK,
     CONF_OUTDOOR_TEMP,
+    CONF_RAIN_ENTITY,
+    CONF_RAIN_POSITION,
     CONF_ROOM_ENTITY,
     CONF_WALL,
     CONF_WALL_POSITION,
     CONF_WEATHER,
+    CONF_WIND_ENTITY,
+    CONF_WIND_POSITION,
     CONF_WINDOW_EXCEPTION,
     CONF_WORKDAY,
     DEFAULTS,
@@ -89,6 +96,9 @@ GLOBAL_ENTITIES = {
     "summer_day": "binary_sensor",
     "evening_mode": "binary_sensor",
     "forecast_max": "sensor",
+    "wind_protection": "binary_sensor",
+    "rain_protection": "binary_sensor",
+    "frost_protection": "binary_sensor",
 }
 WINDOW_ENTITIES = {
     "status": "sensor",
@@ -97,6 +107,9 @@ WINDOW_ENTITIES = {
     "sun_condition": "binary_sensor",
     "sun_protection_today": "binary_sensor",
     "evening_closed": "binary_sensor",
+    "next_action": "sensor",
+    "window_automatic": "switch",
+    "window_sun_protection": "switch",
 }
 
 # Settings only the panel has: the house in the sun compass (shown when all
@@ -122,6 +135,8 @@ OPTION_KEYS = {
     CONF_WEATHER,
     CONF_WORKDAY,
     CONF_HEATING_ENTITY,
+    CONF_WIND_ENTITY,
+    CONF_RAIN_ENTITY,
     CONF_HOUSE_AZIMUTH,
     CONF_HOUSE_WIDTH,
     CONF_HOUSE_DEPTH,
@@ -141,6 +156,9 @@ WINDOW_KEYS = {
     CONF_EVENING_LATEST,
     CONF_WALL,
     CONF_WALL_POSITION,
+    CONF_WIND_POSITION,
+    CONF_RAIN_POSITION,
+    CONF_FROST_POSITION,
 }
 GROUP_KEYS = {*GROUP_DEFAULTS, CONF_NAME, CONF_WALL}
 
@@ -208,6 +226,7 @@ def _option_fields(hass: HomeAssistant, values: dict[str, Any]) -> dict[Any, Any
         _summer_schema(values, temperature_unit(hass)),
         _evening_schema(values),
         _vacation_schema(values),
+        _protection_schema(values, temperature_unit(hass)),
         _startup_schema(values),
         _advanced_schema(values),
     ):
@@ -238,6 +257,7 @@ def _window_fields(
         window_conditions_fields(values),
         window_evening_fields(values, options),
         window_ventilation_fields(values),
+        window_protection_fields(values),
         window_morning_fields(values),
     ):
         fields.update(build)

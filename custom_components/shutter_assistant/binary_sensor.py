@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.const import MATCH_ALL, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -12,6 +12,7 @@ from homeassistant.util import dt as dt_util
 
 from .engine import ShutterConfigEntry, ShutterEngine
 from .entity import GlobalEntity, WindowEntity
+from .logic.protection import KINDS
 
 PARALLEL_UPDATES = 0
 
@@ -23,6 +24,9 @@ async def async_setup_entry(
 ) -> None:
     engine = entry.runtime_data
     async_add_entities([SummerDay(engine), EveningMode(engine)])
+    async_add_entities(
+        WeatherProtection(engine, kind) for kind in KINDS if engine.protection_enabled(kind)
+    )
     for window_id in engine.windows:
         async_add_entities(
             [
@@ -71,6 +75,29 @@ class EveningMode(GlobalEntity, BinarySensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         start, end = self.coordinator.global_evening_times()
         return {"start": start.isoformat(), "end": end.isoformat()}
+
+
+class WeatherProtection(GlobalEntity, BinarySensorEntity):
+    """Wind, rain or frost protection running (ends after the release time)."""
+
+    _attr_device_class = BinarySensorDeviceClass.SAFETY
+
+    def __init__(self, engine: ShutterEngine, kind: str) -> None:
+        super().__init__(engine, f"{kind}_protection")
+        self.kind = kind
+
+    @property
+    def is_on(self) -> bool:
+        return self.coordinator.guards[self.kind].active
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        due = self.coordinator.guards[self.kind].due()
+        return {
+            "release_at": dt_util.as_local(dt_util.utc_from_timestamp(due)).isoformat()
+            if due is not None
+            else None
+        }
 
 
 class Override(WindowEntity, BinarySensorEntity):

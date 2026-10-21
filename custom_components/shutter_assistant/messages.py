@@ -66,6 +66,55 @@ _TEXTS: dict[str, dict[str, str]] = {
         "en": "{name}: window open, cover not moved",
     },
     "until_sunrise": {"de": "Sonnenaufgang", "en": "sunrise"},
+    # closing to a position other than 0 % (evening position, frost, tilted window)
+    "evening_close_partial": {
+        "de": "Abendlauf: auf {position} %",
+        "en": "Evening run: to {position} %",
+    },
+    "follow_up_close_partial": {
+        "de": "Fenster am Abend geschlossen: auf {position} %",
+        "en": "Window closed in the evening: to {position} %",
+    },
+    "trigger_close_partial": {
+        "de": "Schließ-Auslöser aktiv: auf {position} %",
+        "en": "Close trigger active: to {position} %",
+    },
+    "vacation_close_partial": {
+        "de": "Urlaub abends: auf {position} %",
+        "en": "Vacation evening: to {position} %",
+    },
+    "protection_wind": {
+        "de": "Windschutz: auf {position} %",
+        "en": "Wind protection: to {position} %",
+    },
+    "protection_rain": {
+        "de": "Regenschutz: auf {position} %",
+        "en": "Rain protection: to {position} %",
+    },
+    "protection_on": {"de": "{kind} aktiv", "en": "{kind} active"},
+    "protection_off": {"de": "{kind} beendet", "en": "{kind} ended"},
+    "protection_end": {
+        "de": "Wetterschutz beendet: Automatik wieder aktiv",
+        "en": "Weather protection ended: automatic active again",
+    },
+    "kind_wind": {"de": "Windschutz", "en": "Wind protection"},
+    "kind_rain": {"de": "Regenschutz", "en": "Rain protection"},
+    "kind_frost": {"de": "Frostschutz", "en": "Frost protection"},
+    "service": {"de": "Service: auf {position} %", "en": "Service: to {position} %"},
+    "resume": {"de": "Automatik fortgesetzt", "en": "Automatic resumed"},
+    "cover_retry": {
+        "de": "{position} % nicht erreicht, Befehl wiederholt",
+        "en": "{position} % not reached, command repeated",
+    },
+    "cover_failed": {
+        "de": "{position} % auch nach Wiederholung nicht erreicht",
+        "en": "{position} % not reached after repeating",
+    },
+    "notify_failed_title": {"de": "⚠️ Rollo", "en": "⚠️ Cover"},
+    "notify_cover_failed": {
+        "de": "{name}: Rollo hat {position} % nicht erreicht",
+        "en": "{name}: cover did not reach {position} %",
+    },
 }
 
 

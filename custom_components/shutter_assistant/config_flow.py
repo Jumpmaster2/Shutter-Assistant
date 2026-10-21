@@ -37,6 +37,7 @@ from .const import (
     CONF_AZIMUTH_TO,
     CONF_CATCH_UP_AFTER,
     CONF_CLOSED_POSITION,
+    CONF_COMMAND_INTERVAL,
     CONF_COOLING_ENTITY,
     CONF_COVER,
     CONF_DAY_CHANGE,
@@ -49,9 +50,12 @@ from .const import (
     CONF_FOLLOW_UP_CLOSE,
     CONF_FOLLOW_UP_EARLIEST,
     CONF_FORECAST_TYPE,
+    CONF_FROST_POSITION,
+    CONF_FROST_THRESHOLD,
     CONF_GROUP,
     CONF_HEATING_ENTITY,
     CONF_LANGUAGE,
+    CONF_LOCKOUT,
     CONF_LUX_SENSORS,
     CONF_MANUAL_AT_SUN,
     CONF_MANUAL_FOLLOW_UP,
@@ -84,8 +88,12 @@ from .const import (
     CONF_OVERRIDE_IGNORE_EVENING,
     CONF_OVERRIDE_SUNRISE,
     CONF_OVERRIDE_TRIGGER,
+    CONF_PROTECTION_RELEASE,
     CONF_PV_SENSORS,
     CONF_RADIATION_SENSORS,
+    CONF_RAIN_ENTITY,
+    CONF_RAIN_POSITION,
+    CONF_RAIN_THRESHOLD,
     CONF_ROOM_ENTITY,
     CONF_ROOM_MARGIN,
     CONF_ROOM_THRESHOLD,
@@ -96,6 +104,7 @@ from .const import (
     CONF_SUN_POSITION,
     CONF_TEMP_HOLD,
     CONF_TEMP_THRESHOLD,
+    CONF_TILT_SENSORS,
     CONF_TOLERANCE,
     CONF_TRIGGER_ACTIVE,
     CONF_TRIGGER_ENTITIES,
@@ -115,8 +124,12 @@ from .const import (
     CONF_VENT_DELAY_EVENING,
     CONF_VENT_POSITION,
     CONF_VENTILATION,
+    CONF_VERIFY_AFTER,
     CONF_WEATHER,
     CONF_WEEKEND_DAYS,
+    CONF_WIND_ENTITY,
+    CONF_WIND_POSITION,
+    CONF_WIND_THRESHOLD,
     CONF_WINDOW_DEBOUNCE,
     CONF_WINDOW_EXCEPTION,
     CONF_WINDOW_SENSORS,
@@ -135,6 +148,7 @@ from .const import (
     SECTION_CONDITIONS,
     SECTION_EVENING,
     SECTION_OVERRIDE,
+    SECTION_PROTECTION,
     SECTION_VENTILATION,
     SENSOR_KINDS,
     SUBENTRY_GROUP,
@@ -160,6 +174,9 @@ from .units import (
     window_defaults,
 )
 
+# binary contacts and window handles (open / tilted / closed)
+CONTACT_DOMAINS = ["binary_sensor", "input_boolean", "sensor"]
+PROTECTION_POSITIONS = (CONF_WIND_POSITION, CONF_RAIN_POSITION, CONF_FROST_POSITION)
 STATE_SUGGESTIONS = ["off", "on", "unavailable", "unknown", "standby", "idle", "paused", "playing"]
 MORNING_STEPS = {
     MODE_TIME: "morning_time",
@@ -306,7 +323,23 @@ def _advanced_schema(v: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
             _req(CONF_WINDOW_DEBOUNCE, v): _number(0, 120, 1, "s"),
+            _req(CONF_COMMAND_INTERVAL, v): _number(0, 10, 0.5, "s"),
+            _req(CONF_VERIFY_AFTER, v): _number(0, 600, 1, "s"),
             _req(CONF_SHOW_PANEL, v): BooleanSelector(),
+        }
+    )
+
+
+def _protection_schema(v: dict[str, Any], unit: str) -> vol.Schema:
+    temps = defaults(unit)
+    return vol.Schema(
+        {
+            _opt(CONF_WIND_ENTITY, v): _entity(["sensor"]),
+            _req(CONF_WIND_THRESHOLD, v): _number(0, 300, 0.5),
+            _opt(CONF_RAIN_ENTITY, v): _entity(["binary_sensor", "sensor", "input_boolean"]),
+            _req(CONF_RAIN_THRESHOLD, v): _number(0, 100, 0.1),
+            _req(CONF_FROST_THRESHOLD, v, temps): _temperature(unit, -15, 10),
+            _req(CONF_PROTECTION_RELEASE, v): _number(0, 240, 1, "min"),
         }
     )
 
@@ -472,6 +505,7 @@ class ShutterOptionsFlow(OptionsFlow):
                 "summer",
                 "evening",
                 "vacation",
+                "protection",
                 "startup",
                 "advanced",
             ],
@@ -526,6 +560,15 @@ class ShutterOptionsFlow(OptionsFlow):
             step_id="vacation",
             data_schema=_vacation_schema(user_input or self._values),
             errors=errors,
+        )
+
+    async def async_step_protection(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self._save(_clean(user_input), remove=(CONF_WIND_ENTITY, CONF_RAIN_ENTITY))
+        return self.async_show_form(
+            step_id="protection", data_schema=_protection_schema(self._values, self._unit)
         )
 
     async def async_step_override(
@@ -651,7 +694,10 @@ def window_basics_fields(values: dict[str, Any], groups: dict[str, str]) -> dict
         vol.Required(CONF_NAME, default=values.get(CONF_NAME, "")): TextSelector(),
         vol.Required(CONF_COVER, default=values.get(CONF_COVER)): _entity(["cover"]),
         vol.Optional(CONF_WINDOW_SENSORS, default=values.get(CONF_WINDOW_SENSORS, [])): _entity(
-            ["binary_sensor", "input_boolean"], True
+            CONTACT_DOMAINS, True
+        ),
+        vol.Optional(CONF_TILT_SENSORS, default=values.get(CONF_TILT_SENSORS, [])): _entity(
+            CONTACT_DOMAINS, True
         ),
     }
     if groups:
@@ -744,6 +790,16 @@ def window_ventilation_fields(values: dict[str, Any]) -> dict[Any, Any]:
         _wreq(CONF_VENT_DELAY_EVENING, values): _number(0, 600, 1, "s"),
         _wreq(CONF_VENT_DELAY_DAY, values): _number(0, 600, 1, "s"),
         _wreq(CONF_VACATION, values): BooleanSelector(),
+    }
+
+
+def window_protection_fields(values: dict[str, Any]) -> dict[Any, Any]:
+    """Weather protection (empty = not affected) and the lockout protection."""
+    return {
+        _opt(CONF_WIND_POSITION, values): _number(0, 100, 1, "%"),
+        _opt(CONF_RAIN_POSITION, values): _number(0, 100, 1, "%"),
+        _opt(CONF_FROST_POSITION, values): _number(0, 100, 1, "%"),
+        _wreq(CONF_LOCKOUT, values): BooleanSelector(),
     }
 
 
@@ -912,14 +968,20 @@ class WindowSubentryFlow(ConfigSubentryFlow):
     async def async_step_behavior(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        sections = (SECTION_OVERRIDE, SECTION_CONDITIONS, SECTION_EVENING, SECTION_VENTILATION)
+        sections = (
+            SECTION_OVERRIDE,
+            SECTION_CONDITIONS,
+            SECTION_EVENING,
+            SECTION_VENTILATION,
+            SECTION_PROTECTION,
+        )
         errors: dict[str, str] = {}
         if user_input is not None:
             flat = _flatten(user_input, sections)
             if flat.get(CONF_EVENING_CUSTOM):
                 errors = _validate_evening(flat)
             if not errors:
-                for key in (CONF_OPEN_BLOCK, CONF_WINDOW_EXCEPTION):
+                for key in (CONF_OPEN_BLOCK, CONF_WINDOW_EXCEPTION, *PROTECTION_POSITIONS):
                     self._values.pop(key, None)
                 self._values.update(flat)
                 if self._reconfigure:
@@ -941,6 +1003,9 @@ class WindowSubentryFlow(ConfigSubentryFlow):
                 ),
                 vol.Required(SECTION_VENTILATION): section(
                     vol.Schema(window_ventilation_fields(v)), {"collapsed": True}
+                ),
+                vol.Required(SECTION_PROTECTION): section(
+                    vol.Schema(window_protection_fields(v)), {"collapsed": True}
                 ),
             }
         )

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .protection import RAIN, WIND
+
 OPEN = 100
 CLOSED = 0
 
@@ -35,8 +37,11 @@ R_VACATION_OPEN = "vacation_open"
 R_VACATION_CLOSE = "vacation_close"
 R_MORNING = "morning_open"
 R_MORNING_SUN = "morning_sun"
+R_PROTECT_WIND = "protection_wind"
+R_PROTECT_RAIN = "protection_rain"
 
 # Status values of a window
+S_PROTECTION = "protection"
 S_OFF = "off"
 S_STARTUP = "startup"
 S_OVERRIDE = "override"
@@ -44,7 +49,7 @@ S_EVENING = "evening"
 S_SUN = "sun_protection"
 S_VACATION = "vacation"
 S_READY = "ready"
-STATUSES = [S_OFF, S_STARTUP, S_OVERRIDE, S_EVENING, S_SUN, S_VACATION, S_READY]
+STATUSES = [S_PROTECTION, S_OFF, S_STARTUP, S_OVERRIDE, S_EVENING, S_SUN, S_VACATION, S_READY]
 
 
 @dataclass(frozen=True)
@@ -76,6 +81,13 @@ class WindowRules:
     morning: bool = False
     morning_position: int = OPEN
     morning_sun_position: bool = True
+    # weather protection: target position (None = not affected), lowest
+    # position of closing movements during frost (None = off)
+    wind_position: int | None = None
+    rain_position: int | None = None
+    frost_position: int | None = None
+    # door: while it is open nothing closes below the ventilation position
+    lockout: bool = False
 
 
 @dataclass(frozen=True)
@@ -101,6 +113,13 @@ class Situation:
     evening: bool = False
     open_blocked: bool = False
     vacation: bool = False
+    # wind or rain protection that applies to this window (None = none)
+    protection: str | None = None
+    frost: bool = False
+    # only tilted (not open): closing is allowed down to the ventilation position
+    window_tilted: bool = False
+    # switch of the window: sun protection may lower the cover
+    sun_enabled: bool = True
 
     @property
     def window_blocks(self) -> bool:
@@ -114,7 +133,13 @@ class Situation:
 
     @property
     def active(self) -> bool:
-        return self.automatic and not self.startup and self.position is not None
+        """Normal rules may act (a running weather protection suspends them)."""
+        return (
+            self.automatic
+            and not self.startup
+            and self.position is not None
+            and self.protection is None
+        )
 
 
 def _move(position: int, reason: str) -> Action:
@@ -135,7 +160,7 @@ def sun(rules: WindowRules, s: Situation) -> list[Action]:
     """
     if not s.active or s.position is None:
         return []
-    if s.live and s.in_sector and not s.override and not s.sun_marker:
+    if s.live and s.in_sector and not s.override and not s.sun_marker and s.sun_enabled:
         if s.position <= rules.sun_position:
             return [Action(MARK_SUN, R_SUN_ALREADY)]
         if not s.window_blocks:
@@ -230,7 +255,7 @@ def ventilation(rules: WindowRules, s: Situation) -> list[Action]:
     if (
         rules.ventilation
         and s.active
-        and s.window_open
+        and (s.window_open or s.window_tilted)
         and not s.open_blocked
         and s.position is not None
         and s.position <= rules.closed_position
@@ -300,7 +325,55 @@ def morning(rules: WindowRules, s: Situation, manual_since_evening: bool) -> lis
     return actions
 
 
+def protection_kind(rules: WindowRules, active: set[str] | frozenset[str]) -> str | None:
+    """The running protection that applies to the window (wind before rain)."""
+    if WIND in active and rules.wind_position is not None:
+        return WIND
+    if RAIN in active and rules.rain_position is not None:
+        return RAIN
+    return None
+
+
+def protect(rules: WindowRules, s: Situation) -> list[Action]:
+    """Wind or rain: move to the protection position. Also during an override
+    and with the automatic off, not during the restart protection. An open
+    window only prevents closing (as everywhere)."""
+    if s.protection is None or s.startup or s.position is None:
+        return []
+    wind = s.protection == WIND
+    target = rules.wind_position if wind else rules.rain_position
+    if target is None or target == s.position:
+        return []
+    if target < s.position and s.window_blocks:
+        return []
+    return [_move(target, R_PROTECT_WIND if wind else R_PROTECT_RAIN)]
+
+
+def limit_target(
+    rules: WindowRules, s: Situation, target: int, protective: bool = False
+) -> int | None:
+    """Lowest position a closing movement may reach; None if it would not close.
+
+    Frost keeps a gap so the cover cannot freeze on (not for protection moves),
+    a tilted window keeps the ventilation position, and with the lockout
+    protection an open door keeps it as well (always, for safety).
+    """
+    if s.position is None or target >= s.position:
+        return target
+    floor = CLOSED
+    if not protective and s.frost and rules.frost_position is not None:
+        floor = max(floor, rules.frost_position)
+    if not protective and s.window_tilted:
+        floor = max(floor, rules.ventilation_position)
+    if rules.lockout and s.window_open:
+        floor = max(floor, rules.ventilation_position)
+    limited = max(target, floor)
+    return None if limited >= s.position else limited
+
+
 def status(rules: WindowRules, s: Situation) -> str:
+    if s.protection is not None:
+        return S_PROTECTION
     if not s.automatic:
         return S_OFF
     if s.startup:

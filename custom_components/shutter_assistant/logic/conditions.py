@@ -169,3 +169,41 @@ def heat_need(room: bool | None, cooling: bool, heating_day: bool) -> bool:
     if room is False:
         return False
     return not heating_day
+
+
+CONTACT_OPEN = "open"
+CONTACT_TILTED = "tilted"
+CONTACT_CLOSED = "closed"
+_OPEN_STATES = ("on", "open", "opened")
+_TILTED_STATES = ("tilted", "tilt")
+_CLOSED_STATES = ("off", "closed", "close")
+
+
+def contact(state: str | None, tilt_sensor: bool = False) -> str:
+    """State of one contact: binary (on = open, or tilted for a tilt contact) or a
+    window handle with the states open, tilted and closed.
+
+    An unknown state is not safe: a window contact then counts as open, a tilt
+    contact as tilted.
+    """
+    if state in _CLOSED_STATES:
+        return CONTACT_CLOSED
+    if state in _TILTED_STATES:
+        return CONTACT_TILTED
+    if state in _OPEN_STATES:
+        return CONTACT_TILTED if tilt_sensor else CONTACT_OPEN
+    return CONTACT_TILTED if tilt_sensor else CONTACT_OPEN
+
+
+def window_contact(states: Iterable[str | None], tilt_states: Iterable[str | None] = ()) -> str:
+    """Open if any contact is open, else tilted if any is tilted, else closed."""
+    found = {contact(s) for s in states} | {contact(s, True) for s in tilt_states}
+    for result in (CONTACT_OPEN, CONTACT_TILTED):
+        if result in found:
+            return result
+    return CONTACT_CLOSED
+
+
+def reported_open(states: Iterable[str | None]) -> bool:
+    """A contact really reports open (an unavailable contact only blocks)."""
+    return any(s in _OPEN_STATES for s in states)
