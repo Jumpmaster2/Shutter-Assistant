@@ -1,6 +1,7 @@
 // Small tiles for the sections view, loaded together with card.js.
 //
-// Cover or window contact, 3 x 1: the cover comes down as slats from the top of
+// Cover or window contact, 3 x 1: the name at the top, below the icon and the
+// state. The cover comes down as slats from the top of
 // the tile, an open or tilted window colors the tile.
 //
 //   type: custom:shutter-assistant-tile
@@ -213,8 +214,8 @@ class ShutterAssistantTile extends TileBase {
     }
     this._paint(`<div class="tile ${cls}">${fill}
       <div class="in">
-        <div class="top"><span class="icon">${this._config.icon || id.startsWith("cover.") ? this._icon(id, this._config.icon) : this._contactIcon(id, cls)}</span><span class="value">${esc(text)}</span></div>
         <div class="name">${esc(name)}</div>
+        <div class="bottom"><span class="icon">${this._config.icon || id.startsWith("cover.") ? this._icon(id, this._config.icon) : this._contactIcon(id, cls)}</span><span class="value">${esc(text)}</span></div>
       </div></div>`);
   }
 }
@@ -337,12 +338,11 @@ ha-card { height:100%; min-height:56px; overflow:hidden; cursor:pointer; positio
 .tint { position:absolute; inset:0; background:color-mix(in srgb, var(--c) 22%, transparent); }
 .in { position:relative; height:100%; box-sizing:border-box; padding:6px 9px; display:flex; flex-direction:column; justify-content:space-between; min-width:0; }
 .in.center { justify-content:center; font-size:12px; color:var(--secondary-text-color); }
-.top, .bottom { display:flex; align-items:center; gap:4px; min-width:0; }
+.bottom { display:flex; align-items:center; gap:5px; min-width:0; }
 .icon { display:flex; flex:none; color:var(--c); --mdc-icon-size:20px; }
-.value { margin-left:auto; font-weight:600; font-size:13px; white-space:nowrap; }
+.value { font-weight:600; font-size:13px; white-space:nowrap; }
 .tile.open .value, .tile.tilted .value { color:var(--c); font-size:11.5px; }
 .name { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; color:var(--primary-text-color); }
-.bottom { justify-content:space-between; }
 .part { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; padding:1px 8px 1px 4px; border-radius:10px; white-space:nowrap; color:var(--primary-text-color); background:var(--secondary-background-color, rgba(127,127,127,.15)); }
 .part .icon { --mdc-icon-size:16px; }
 .part.cover { margin-left:auto; }

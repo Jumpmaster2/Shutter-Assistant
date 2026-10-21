@@ -219,7 +219,7 @@ compass: true            # optional: show the sun compass
 
 ### Small tiles for the sections dashboard
 
-**Shutter Assistant tile** (3 × 1): one cover or one window contact. The cover comes down as slats from the top of the tile, next to it the position. An open or tilted window colors the tile. A tap opens the more info dialog.
+**Shutter Assistant tile** (3 × 1): one cover or one window contact. The name at the top, below it the icon and the state (position or open, tilted, closed). The cover comes down as slats from the top of the tile. An open or tilted window colors the tile. A tap opens the more info dialog.
 
 ```yaml
 type: custom:shutter-assistant-tile

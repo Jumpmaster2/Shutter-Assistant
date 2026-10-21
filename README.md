@@ -219,7 +219,7 @@ compass: true            # optional: Sonnenkompass anzeigen
 
 ### Kleine Kacheln für den Abschnitte-Dashboard
 
-**Shutter Assistant Kachel** (3 × 1): ein Rollo oder ein Fensterkontakt. Der Rollo fährt als Lamellen von oben in die Kachel, daneben der Öffnungsgrad. Ein offenes oder gekipptes Fenster färbt die Kachel. Antippen öffnet den Info-Dialog.
+**Shutter Assistant Kachel** (3 × 1): ein Rollo oder ein Fensterkontakt. Oben steht der Name, darunter Symbol und Zustand (Öffnungsgrad bzw. offen, gekippt, zu). Der Rollo fährt als Lamellen von oben in die Kachel. Ein offenes oder gekipptes Fenster färbt die Kachel. Antippen öffnet den Info-Dialog.
 
 ```yaml
 type: custom:shutter-assistant-tile
