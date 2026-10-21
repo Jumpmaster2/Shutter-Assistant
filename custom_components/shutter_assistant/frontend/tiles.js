@@ -7,7 +7,8 @@
 //   entity: cover.wohnzimmer       # cover, binary_sensor (on = open) or sensor (open/tilted/closed)
 //   name: Wohnzimmer               # optional
 //
-// Window with cover and contact, 6 x 1:
+// Window with cover and contact, 6 x 1: the name at the top, below the window
+// on the left and the cover on the right:
 //
 //   type: custom:shutter-assistant-window-tile
 //   window: Wohnzimmer             # name or id of a window of Shutter Assistant, or:
@@ -285,6 +286,8 @@ class ShutterAssistantWindowTile extends TileBase {
 
   _windowState() {
     if (this._config.contact) return this._contact(this._config.contact, this._config.tilt);
+    // only a cover: no window part
+    if (!this._win) return undefined;
     const st = this._state(this._win?.entities?.status);
     if (!st || INVALID.includes(st.state)) return null;
     // windows without contacts have no window state
@@ -301,17 +304,22 @@ class ShutterAssistantWindowTile extends TileBase {
     const coverId = this._coverId();
     if (!coverId) return;
     const cover = this._cover(coverId);
-    const name = this._config.name || this._win?.name || this._state(coverId)?.attributes.friendly_name || coverId;
+    const name =
+      this._config.name ||
+      this._win?.name ||
+      this._state(this._config.contact)?.attributes.friendly_name ||
+      this._state(coverId)?.attributes.friendly_name ||
+      coverId;
     const state = this._windowState();
     const contactIcon = this._contactIcon(this._config.contact, state);
     const win =
       state === undefined
         ? ""
-        : `<span class="win ${state || "na"}"><span class="icon">${contactIcon}</span><span>${esc(this._windowText(state))}</span></span>`;
+        : `<span class="part win ${state || "na"}"><span class="icon">${contactIcon}</span><span>${esc(this._windowText(state))}</span></span>`;
     this._paint(`<div class="tile ${cover.cls}"><div class="slats" style="height:${cover.closed}%"></div>
       <div class="in">
-        <div class="top"><span class="icon">${this._icon(coverId, this._config.icon)}</span><span class="name">${esc(name)}</span><span class="value">${esc(cover.text)}</span></div>
-        <div class="bottom">${win}</div>
+        <div class="name">${esc(name)}</div>
+        <div class="bottom">${win}<span class="part cover"><span class="icon">${this._icon(coverId, this._config.icon)}</span><span>${esc(cover.text)}</span></span></div>
       </div></div>`);
   }
 }
@@ -334,9 +342,11 @@ ha-card { height:100%; min-height:56px; overflow:hidden; cursor:pointer; positio
 .value { margin-left:auto; font-weight:600; font-size:13px; white-space:nowrap; }
 .tile.open .value, .tile.tilted .value { color:var(--c); font-size:11.5px; }
 .name { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; color:var(--primary-text-color); }
-.top .name { flex:1; font-size:13px; }
-.win { display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:1px 8px 1px 4px; border-radius:10px; color:var(--secondary-text-color); background:var(--secondary-background-color, rgba(127,127,127,.15)); --c:var(--color-closed); }
-.win .icon { --mdc-icon-size:16px; }
+.bottom { justify-content:space-between; }
+.part { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; padding:1px 8px 1px 4px; border-radius:10px; white-space:nowrap; color:var(--primary-text-color); background:var(--secondary-background-color, rgba(127,127,127,.15)); }
+.part .icon { --mdc-icon-size:16px; }
+.part.cover { margin-left:auto; }
+.win { color:var(--secondary-text-color); --c:var(--color-closed); }
 .win.open { --c:var(--color-open); color:var(--c); background:color-mix(in srgb, var(--c) 20%, transparent); }
 .win.tilted { --c:var(--color-tilted); color:var(--c); background:color-mix(in srgb, var(--c) 20%, transparent); }
 `;

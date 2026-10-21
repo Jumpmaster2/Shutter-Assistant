@@ -228,7 +228,7 @@ name: Living room          # optional
 icon: mdi:blinds           # optional
 ```
 
-**Shutter Assistant window tile** (6 × 1): cover and window together, name and position at the top, the window state below.
+**Shutter Assistant window tile** (6 × 1): window and cover together: the name at the top, below it the window (open, tilted, closed) on the left and the cover with its position on the right. Without a window contact only the cover.
 
 ```yaml
 type: custom:shutter-assistant-window-tile

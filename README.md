@@ -228,7 +228,7 @@ name: Wohnzimmer           # optional
 icon: mdi:blinds           # optional
 ```
 
-**Shutter Assistant Fensterkachel** (6 × 1): Rollo und Fenster zusammen, oben Name und Öffnungsgrad, unten der Fensterzustand.
+**Shutter Assistant Fensterkachel** (6 × 1): Fenster und Rollo zusammen: oben der Name, darunter links das Fenster (offen, gekippt, zu) und rechts der Rollo mit Öffnungsgrad. Ohne Fensterkontakt nur der Rollo.
 
 ```yaml
 type: custom:shutter-assistant-window-tile
