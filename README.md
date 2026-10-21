@@ -6,7 +6,7 @@ Custom Integration für Home Assistant, die Rollos und Raffstores automatisch st
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.5.0.
+> Status: Version 0.6.0.
 
 ## Funktionsweise
 
@@ -216,6 +216,29 @@ title: Rollos            # optional
 windows: [Wohnzimmer]    # optional: Namen oder IDs, Standard alle
 compass: true            # optional: Sonnenkompass anzeigen
 ```
+
+### Kleine Kacheln für den Abschnitte-Dashboard
+
+**Shutter Assistant Kachel** (3 × 1): ein Rollo oder ein Fensterkontakt. Oben steht der Name, darunter Symbol und Zustand (Öffnungsgrad bzw. offen, gekippt, zu). Der Rollo fährt als Lamellen von oben in die Kachel. Ein offenes oder gekipptes Fenster färbt die Kachel. Antippen öffnet den Info-Dialog.
+
+```yaml
+type: custom:shutter-assistant-tile
+entity: cover.wohnzimmer   # Rollo, binary_sensor (an = offen) oder Fenstergriff (open/tilted/closed)
+name: Wohnzimmer           # optional
+icon: mdi:blinds           # optional
+```
+
+**Shutter Assistant Fensterkachel** (6 × 1): Fenster und Rollo zusammen: oben der Name, darunter links das Fenster (offen, gekippt, zu) und rechts der Rollo mit Öffnungsgrad. Ohne Fensterkontakt nur der Rollo.
+
+```yaml
+type: custom:shutter-assistant-window-tile
+window: Wohnzimmer         # Fenster von Shutter Assistant (Name oder ID), oder selbst:
+cover: cover.wohnzimmer
+contact: binary_sensor.wohnzimmerfenster
+tilt: binary_sensor.wohnzimmerfenster_gekippt   # optional, an = gekippt
+```
+
+Farben (beide Kacheln, optional): `color_cover`, `color_closed`, `color_open` und `color_tilted`, jeweils ein Farbname des Themes (`purple`, `orange`, `teal`, …) oder eine CSS-Farbe (`"#00897b"`). Alles lässt sich auch im Karten-Editor einstellen.
 
 ## Eigene Dashboard-Karten
 
