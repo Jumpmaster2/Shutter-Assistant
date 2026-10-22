@@ -144,6 +144,7 @@ from .const import (
     CONF_WINDOW_DEBOUNCE,
     CONF_WINDOW_EXCEPTION,
     CONF_WINDOW_SENSORS,
+    CONF_WINDOW_WIND_THRESHOLD,
     CONF_WORKDAY,
     DOMAIN,
     EVENT_COVER_FAILED,
@@ -273,6 +274,9 @@ class Window:
     window_tilted: bool = False
     # wind or rain protection running for this window
     protection: str | None = None
+    # own wind threshold (None = the global one) and its protection state (persisted)
+    wind_threshold: float | None = None
+    wind_guard: Guard | None = None
     # switches of the window (persisted)
     automatic: bool = True
     sun_enabled: bool = True
@@ -326,6 +330,9 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         release = float(self.opt(CONF_PROTECTION_RELEASE)) * 60
         self.guards: dict[str, Guard] = {kind: Guard(release) for kind in KINDS}
         self._build()
+        for win in self.windows.values():
+            if win.wind_threshold is not None:
+                win.wind_guard = Guard(release)
 
     # ------------------------------------------------------------------ config
 
@@ -430,6 +437,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             ),
             evening_settings=evening_settings,
             morning_settings=morning_settings,
+            wind_threshold=as_float(conf.get(CONF_WINDOW_WIND_THRESHOLD)),
             temp_hold=Hold(float(conf[CONF_TEMP_HOLD]) * 60),
             live_hold=Hold(float(conf[CONF_SUN_HOLD]) * 60),
             no_temp=FollowUp(float(conf[CONF_MANUAL_FOLLOW_UP]) * 60),
@@ -512,6 +520,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             win.last_reason = data.get("last_reason") or {}
             win.automatic = bool(data.get("automatic", True))
             win.sun_enabled = bool(data.get("sun_enabled", True))
+            guard_data = data.get("wind_guard") or {}
+            if win.wind_guard is not None and guard_data.get("active"):
+                win.wind_guard.active = True
+                win.wind_guard.release_due = as_float(guard_data.get("release_due"))
             locked = _to_datetime(data.get("trigger_locked_until"))
             if locked is not None and locked > now:
                 win.trigger.locked_until = locked
@@ -544,6 +556,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     "trigger_pending": win.trigger.pending,
                     "automatic": win.automatic,
                     "sun_enabled": win.sun_enabled,
+                    "wind_guard": _guard_data(win.wind_guard),
                 }
                 for wid, win in self.windows.items()
             },
@@ -1334,38 +1347,85 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     def active_protections(self) -> frozenset[str]:
         return frozenset(kind for kind, guard in self.guards.items() if guard.active)
 
+    def _guard(self, win: Window, kind: str) -> Guard:
+        """The guard that decides the protection for the window (own wind threshold)."""
+        if kind == WIND and win.wind_guard is not None:
+            return win.wind_guard
+        return self.guards[kind]
+
+    def _window_guards(self) -> list[Guard]:
+        """The wind guards of the windows with an own threshold."""
+        return [win.wind_guard for win in self.windows.values() if win.wind_guard is not None]
+
+    def protection_active(self, kind: str) -> bool:
+        """A protection of the kind is running, globally or for a window."""
+        guards = [self.guards[kind], *(self._window_guards() if kind == WIND else [])]
+        return any(guard.active for guard in guards)
+
+    def protection_due(self, kind: str) -> float | None:
+        """Latest time at which the running protections of the kind may end."""
+        guards = [self.guards[kind], *(self._window_guards() if kind == WIND else [])]
+        dues = [due for guard in guards if (due := guard.due()) is not None]
+        return max(dues) if dues else None
+
+    def _update_guard(
+        self, guard: Guard, over: bool | None, ts: float, kind: str, key: str, win: Window | None
+    ) -> bool:
+        """Update one guard, report a change and plan its release. True if it changed."""
+        changed = guard.update(over, ts)
+        if changed:
+            data: dict[str, Any] = {"kind": kind, "active": guard.active}
+            name = text(self.language, f"kind_{kind}")
+            if win is not None:
+                data.update(window=win.name, window_id=win.window_id)
+                name = f"{name} ({win.name})"
+            self.hass.bus.async_fire(EVENT_PROTECTION, data)
+            self.hass.bus.async_fire(
+                EVENT_LOGBOOK,
+                {
+                    "name": NAME,
+                    "message": text(
+                        self.language,
+                        "protection_on" if guard.active else "protection_off",
+                        kind=name,
+                    ),
+                },
+            )
+        due = guard.due()
+        self._schedule(
+            f"protection:{key}",
+            dt_util.utc_from_timestamp(due) if due is not None else None,
+            self._on_protection_due,
+        )
+        return changed
+
     def _update_protection(self, now: datetime) -> bool:
         """Update wind, rain and frost and act on the windows. True if one changed."""
         ts = now.timestamp()
         values = self._protection_values()
         changed = False
         for kind, guard in self.guards.items():
-            if guard.update(values[kind], ts):
+            if self._update_guard(guard, values[kind], ts, kind, kind, None):
                 changed = True
-                name = text(self.language, f"kind_{kind}")
-                self.hass.bus.async_fire(EVENT_PROTECTION, {"kind": kind, "active": guard.active})
-                self.hass.bus.async_fire(
-                    EVENT_LOGBOOK,
-                    {
-                        "name": NAME,
-                        "message": text(
-                            self.language,
-                            "protection_on" if guard.active else "protection_off",
-                            kind=name,
-                        ),
-                    },
-                )
-            due = guard.due()
-            self._schedule(
-                f"protection:{kind}",
-                dt_util.utc_from_timestamp(due) if due is not None else None,
-                self._on_protection_due,
-            )
+        # windows with an own wind threshold
+        wind = (
+            self._state_value(self.opt(CONF_WIND_ENTITY)) if self.protection_enabled(WIND) else None
+        )
+        for win in self.windows.values():
+            if win.wind_guard is None or win.wind_threshold is None:
+                continue
+            over = above(wind, win.wind_threshold) if self.protection_enabled(WIND) else False
+            key = f"{WIND}:{win.window_id}"
+            if self._update_guard(win.wind_guard, over, ts, WIND, key, win):
+                changed = True
         if changed:
             self._save()
         active = self.active_protections
         for win in self.windows.values():
-            kind = rules.protection_kind(win.rules, active)
+            own = active
+            if win.wind_guard is not None:
+                own = (active - {WIND}) | ({WIND} if win.wind_guard.active else set())
+            kind = rules.protection_kind(win.rules, own)
             if kind == win.protection:
                 continue
             changed = True
@@ -1719,7 +1779,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             if (when := self._timer_due.get(key)) is not None and when > now:
                 found.append((when, action))
 
-        release = self.guards[win.protection].due() if win.protection else None
+        release = self._guard(win, win.protection).due() if win.protection else None
         if release is not None:
             found.append((dt_util.utc_from_timestamp(release), "protection_end"))
         if win.override_active and win.override_until is not None:
@@ -2224,6 +2284,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     "automatic": win.automatic,
                     "sun_enabled": win.sun_enabled,
                     "verify": win.verify,
+                    "wind_threshold": win.wind_threshold,
+                    "wind_guard": _guard_data(win.wind_guard),
                     "timers": sorted(k for k in self._timers if k.startswith(wid)),
                 }
                 for wid, win in self.windows.items()
@@ -2233,6 +2295,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
 
 def _iso(value: date | datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
+
+
+def _guard_data(guard: Guard | None) -> dict[str, Any] | None:
+    return None if guard is None else {"active": guard.active, "release_due": guard.release_due}
 
 
 def _split(state: str | None, tilt: bool) -> tuple[list[str | None], list[str | None]]:

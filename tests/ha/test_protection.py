@@ -6,6 +6,7 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 
 from .conftest import CONTACT, OUTDOOR, advance, make_entry, set_cover, setup_entry
+from .conftest import COVER as COVER_LIVING
 
 WIND = "sensor.wind_gust"
 RAIN = "binary_sensor.rain"
@@ -55,6 +56,75 @@ async def test_wind_moves_also_during_an_override_and_releases_later(
     await advance(hass, freezer, 2 * 60)
     assert hass.states.get(WIND_ON).state == "off"
     assert events[-1].data == {"kind": "wind", "active": False}
+    assert hass.states.get(STATUS).state != "protection"
+
+
+async def test_own_wind_threshold_per_window(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    second = "cover.balcony"
+    freezer.move_to("2026-10-15 12:00:00+02:00")
+    hass.states.async_set(WIND, "10")
+    hass.states.async_set(second, "open", {"current_position": 100, "supported_features": 15})
+    set_cover(hass, 40)
+    balcony = {
+        "window_balcony": {
+            "name": "Balcony",
+            "cover": second,
+            "window_sensors": [],
+            "wind_position": 20,
+            "window_wind_threshold": 50,
+        }
+    }
+    entry = make_entry(
+        window={"wind_position": 20},
+        extra_windows=balcony,
+        wind_entity=WIND,
+        wind_threshold=75,
+        protection_release=15,
+    )
+    await setup_entry(hass, entry)
+    events = []
+    hass.bus.async_listen("shutter_assistant_protection", events.append)
+
+    def moved() -> list[tuple[str, int]]:
+        return [(c.data["entity_id"], c.data["position"]) for c in calls["set_cover_position"]]
+
+    # above the own threshold of the balcony, below the global one
+    hass.states.async_set(WIND, "60")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 30, step=1)
+    assert moved() == [(second, 20)]
+    assert hass.states.get(WIND_ON).state == "on"
+    assert hass.states.get(WIND_ON).attributes["windows"] == ["Balcony"]
+    assert events[-1].data == {
+        "kind": "wind",
+        "active": True,
+        "window": "Balcony",
+        "window_id": "window_balcony",
+    }
+    assert hass.states.get(STATUS).state != "protection"
+
+    # the own state survives a reload
+    await advance(hass, freezer, 10, step=1)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(WIND_ON).state == "on"
+
+    # above the global threshold: the living room follows
+    hass.states.async_set(WIND, "80")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 30, step=1)
+    assert (COVER_LIVING, 20) in moved()
+    assert hass.states.get(STATUS).state == "protection"
+
+    # calm: both end after the release time
+    hass.states.async_set(WIND, "5")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 14 * 60)
+    assert hass.states.get(WIND_ON).state == "on"
+    await advance(hass, freezer, 2 * 60)
+    assert hass.states.get(WIND_ON).state == "off"
     assert hass.states.get(STATUS).state != "protection"
 
 

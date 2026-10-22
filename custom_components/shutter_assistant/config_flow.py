@@ -133,6 +133,7 @@ from .const import (
     CONF_WINDOW_DEBOUNCE,
     CONF_WINDOW_EXCEPTION,
     CONF_WINDOW_SENSORS,
+    CONF_WINDOW_WIND_THRESHOLD,
     CONF_WORKDAY,
     DEFAULTS,
     DOMAIN,
@@ -176,7 +177,12 @@ from .units import (
 
 # binary contacts and window handles (open / tilted / closed)
 CONTACT_DOMAINS = ["binary_sensor", "input_boolean", "sensor"]
-PROTECTION_POSITIONS = (CONF_WIND_POSITION, CONF_RAIN_POSITION, CONF_FROST_POSITION)
+PROTECTION_POSITIONS = (
+    CONF_WIND_POSITION,
+    CONF_WINDOW_WIND_THRESHOLD,
+    CONF_RAIN_POSITION,
+    CONF_FROST_POSITION,
+)
 STATE_SUGGESTIONS = ["off", "on", "unavailable", "unknown", "standby", "idle", "paused", "playing"]
 MORNING_STEPS = {
     MODE_TIME: "morning_time",
@@ -797,6 +803,7 @@ def window_protection_fields(values: dict[str, Any]) -> dict[Any, Any]:
     """Weather protection (empty = not affected) and the lockout protection."""
     return {
         _opt(CONF_WIND_POSITION, values): _number(0, 100, 1, "%"),
+        _opt(CONF_WINDOW_WIND_THRESHOLD, values): _number(0, 300, 0.5),
         _opt(CONF_RAIN_POSITION, values): _number(0, 100, 1, "%"),
         _opt(CONF_FROST_POSITION, values): _number(0, 100, 1, "%"),
         _wreq(CONF_LOCKOUT, values): BooleanSelector(),

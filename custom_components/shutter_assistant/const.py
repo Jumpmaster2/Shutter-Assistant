@@ -171,6 +171,8 @@ CONF_TILT_SENSORS = "tilt_sensors"
 CONF_LOCKOUT = "lockout_protection"
 # Weather protection per window (empty = not affected / off).
 CONF_WIND_POSITION = "wind_position"
+# own wind threshold of the window (empty = the global threshold)
+CONF_WINDOW_WIND_THRESHOLD = "window_wind_threshold"
 CONF_RAIN_POSITION = "rain_position"
 CONF_FROST_POSITION = "frost_position"
 

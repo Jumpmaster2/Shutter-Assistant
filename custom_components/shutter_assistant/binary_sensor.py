@@ -12,7 +12,7 @@ from homeassistant.util import dt as dt_util
 
 from .engine import ShutterConfigEntry, ShutterEngine
 from .entity import GlobalEntity, WindowEntity
-from .logic.protection import KINDS
+from .logic.protection import KINDS, WIND
 
 PARALLEL_UPDATES = 0
 
@@ -88,16 +88,23 @@ class WeatherProtection(GlobalEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool:
-        return self.coordinator.guards[self.kind].active
+        # also on while only a window with an own wind threshold is protected
+        return self.coordinator.protection_active(self.kind)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        due = self.coordinator.guards[self.kind].due()
-        return {
+        engine = self.coordinator
+        due = engine.protection_due(self.kind)
+        attrs: dict[str, Any] = {
             "release_at": dt_util.as_local(dt_util.utc_from_timestamp(due)).isoformat()
             if due is not None
             else None
         }
+        if self.kind == WIND:
+            attrs["windows"] = sorted(
+                win.name for win in engine.windows.values() if win.protection == WIND
+            )
+        return attrs
 
 
 class Override(WindowEntity, BinarySensorEntity):
