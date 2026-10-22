@@ -417,6 +417,10 @@ export const LABELS = {
    "Fensterkontakte",
    "'on' = offen. Fenstergriffe mit den Zuständen open, tilted und closed gehen auch. Unbekannt oder nicht verfügbar zählt als offen."
   ],
+  "window_wind_threshold": [
+   "Eigene Windschwelle",
+   "Leer = Windschutz ab der Schwelle der Grundeinstellungen. Sonst schützt dieses Fenster schon oder erst ab diesem Wert (Einheit des Windsensors)."
+  ],
   "workday_entity": [
    "Werktag-Sensor",
    "Optional, für die Morgenöffnung nach Uhrzeit (z. B. Workday-Integration, berücksichtigt Feiertage). Ohne Sensor entscheiden die Wochenendtage."
@@ -838,6 +842,10 @@ export const LABELS = {
   "window_sensors": [
    "Window contacts",
    "'on' = open. Window handles with the states open, tilted and closed work as well. Unknown or unavailable counts as open."
+  ],
+  "window_wind_threshold": [
+   "Own wind threshold",
+   "Empty = wind protection from the threshold of the basic settings. Otherwise this window is protected already or only from this value (unit of the wind sensor)."
   ],
   "workday_entity": [
    "Workday sensor",

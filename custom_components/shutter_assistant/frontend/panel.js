@@ -425,7 +425,7 @@ const WINDOW_CARDS = [
     ],
   },
 ];
-WINDOW_CARDS.push({ id: "w_protection", icon: "mdi:weather-windy", fields: () => ["wind_position", "rain_position", "frost_position", "lockout_protection"] });
+WINDOW_CARDS.push({ id: "w_protection", icon: "mdi:weather-windy", fields: () => ["wind_position", "window_wind_threshold", "rain_position", "frost_position", "lockout_protection"] });
 const GROUP_CARDS = [
   { id: "g_basics", icon: "mdi:compass-outline", fields: () => ["name", "wall", "azimuth_from", "azimuth_to"] },
   { id: "g_sensors", icon: "mdi:weather-sunny", fields: () => ["radiation_sensors", "pv_sensors", "lux_sensors"] },
