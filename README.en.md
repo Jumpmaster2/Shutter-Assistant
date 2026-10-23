@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.8.1.
+> Status: version 0.9.0.
 
 ## How it works
 
@@ -47,6 +47,7 @@ The integration is event driven: it only reacts to state changes of the configur
 * **Wind and rain:** globally a wind sensor with a threshold (in the unit of the sensor) and a rain sensor (on/off or an amount above a threshold). Per window a **position with wind** and **with rain**, empty = not affected (e.g. external venetian blinds to 100 % with wind, a roof window to 0 % with rain). An **own wind threshold** on a window replaces the global threshold for that window (e.g. a balcony shutter already from 50 km/h, the others only from 75 km/h); it has its own release time, and the wind protection binary sensor is on while any window is protected (attribute `windows`). The protection starts at once and moves the affected covers to their position once, **also during an override** (not during the restart protection; caught up afterwards). A cover moved by hand during the protection keeps that position: saving settings (reload) does not move covers that are already protected again. A cover already **further closed** than its protection position counts as protected and is not opened (option **Further closed counts as protected**, default on; not for 100 %, retracting external venetian blinds always runs). Wind comes before rain. An open window only prevents closing; it is caught up as soon as the window is closed.
 * **While the protection runs,** all other rules of the window rest (status "Weather protection"). It ends only after the value stayed on the safe side for the **release time** (default 15 min). An unavailable sensor never ends a protection. Afterwards the automatic decides again (sun protection, evening run); the old position is not restored.
 * **Frost:** windows with a **lowest position with frost** (e.g. 5 %) close only down to it while the outdoor temperature is at or below the frost threshold (default 1 °C), so the cover cannot freeze on. This applies to all automatic movements and services, not to the wind and rain protection.
+* **Display:** while the wind or rain protection runs, the overview in the panel and the card show the current value of the sensor that triggered it (e.g. "Wind protection 62 km/h"). The wind and rain protection binary sensors name the sensor in the attribute `sensor`.
 * Start and end are written to the logbook, plus the event `shutter_assistant_protection` with `kind` (wind, rain, frost) and `active`.
 
 ### Reliability

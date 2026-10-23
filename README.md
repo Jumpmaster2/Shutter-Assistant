@@ -6,7 +6,7 @@ Custom Integration für Home Assistant, die Rollos und Raffstores automatisch st
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.8.1.
+> Status: Version 0.9.0.
 
 ## Funktionsweise
 
@@ -47,6 +47,7 @@ Die Integration arbeitet ereignisgesteuert: Sie reagiert nur auf Zustandswechsel
 * **Wind und Regen:** global ein Windsensor mit Schwelle (in der Einheit des Sensors) und ein Regensensor (an/aus oder eine Menge über einer Schwelle). Pro Fenster eine **Position bei Wind** und **bei Regen**, leer = nicht betroffen (z. B. Raffstores bei Wind auf 100 %, ein Dachfenster bei Regen auf 0 %). Eine **eigene Windschwelle** am Fenster ersetzt für dieses Fenster die globale Schwelle (z. B. ein Balkonrollo schon ab 50 km/h, die übrigen erst ab 75 km/h); sie hat eine eigene Freigabezeit, und der Binärsensor Windschutz ist an, solange irgendein Fenster geschützt wird (Attribut `windows`). Der Schutz beginnt sofort und fährt die betroffenen Rollos einmal auf ihre Position, **auch bei Übersteuerung** (nicht im Neustart-Schutz, danach nachgeholt). Wer ein Rollo während des Schutzes von Hand verfährt, behält diese Position: Speichern von Einstellungen (Neuladen) fährt bereits geschützte Rollos nicht erneut. Ein Rollo, das schon **weiter zu** ist als seine Schutzposition, gilt als geschützt und wird nicht hochgefahren (Option **Weiter geschlossen gilt als geschützt**, Standard an; nicht bei 100 %, Raffstores einfahren läuft immer). Wind geht vor Regen. Ein offenes Fenster verhindert nur Schließfahrten; sie werden nachgeholt, sobald es zu ist.
 * **Solange der Schutz läuft,** ruhen alle anderen Regeln für das Fenster (Status „Wetterschutz“). Er endet erst, wenn der Wert die **Freigabezeit** (Standard 15 min) lang wieder im sicheren Bereich war. Ein nicht verfügbarer Sensor beendet nie einen Schutz. Danach entscheidet die Automatik neu (Sonnenschutz, Abendlauf); die alte Position wird nicht wiederhergestellt.
 * **Frost:** Fenster mit einer **tiefsten Position bei Frost** (z. B. 5 %) schließen bei einer Außentemperatur bis zur Frostschwelle (Standard 1 °C) nur bis dorthin, damit das Rollo nicht anfriert. Das gilt für alle automatischen Fahrten und Services, nicht für den Wind- und Regenschutz.
+* **Anzeige:** Solange Wind- oder Regenschutz läuft, zeigen die Übersicht im Panel und die Karte den aktuellen Wert des auslösenden Sensors (z. B. „Windschutz 62 km/h“). Die Binärsensoren Wind- und Regenschutz nennen den Sensor im Attribut `sensor`.
 * Ein- und Ende stehen im Logbuch, dazu das Ereignis `shutter_assistant_protection` mit `kind` (wind, rain, frost) und `active`.
 
 ### Zuverlässigkeit

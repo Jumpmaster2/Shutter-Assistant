@@ -104,6 +104,7 @@ async def test_own_wind_threshold_per_window(
     assert moved() == [(second, 20)]
     assert hass.states.get(WIND_ON).state == "on"
     assert hass.states.get(WIND_ON).attributes["windows"] == ["Balcony"]
+    assert hass.states.get(WIND_ON).attributes["sensor"] == WIND
     assert events[-1].data == {
         "kind": "wind",
         "active": True,

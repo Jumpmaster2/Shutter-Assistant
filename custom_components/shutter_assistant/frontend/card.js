@@ -147,6 +147,14 @@ class ShutterAssistantCard extends HTMLElement {
     return id ? this._hass?.states?.[id] : undefined;
   }
 
+  _value(id) {
+    const st = this._state(id);
+    const number = Number(st?.state);
+    if (!st || st.state === "" || Number.isNaN(number)) return "";
+    const text = number.toLocaleString(this._hass?.locale?.language || this.lang, { maximumFractionDigits: 1 });
+    return `${text} ${st.attributes.unit_of_measurement || ""}`.trim();
+  }
+
   _windows() {
     const all = this._data?.windows || [];
     const wanted = this._config?.windows;
@@ -156,6 +164,8 @@ class ShutterAssistantCard extends HTMLElement {
 
   _ids() {
     const ids = ["sun.sun", ...Object.values(this._data?.entities || {})];
+    // sensors of the weather protection (their value is shown while it runs)
+    for (const [kind] of PROTECTIONS) ids.push(this._state(this._data?.entities?.[`${kind}_protection`])?.attributes?.sensor);
     for (const win of this._windows()) ids.push(win.cover, ...Object.values(win.entities || {}));
     return ids.filter(Boolean);
   }
@@ -242,8 +252,11 @@ class ShutterAssistantCard extends HTMLElement {
     const auto = this._state(ent.automatic);
     if (auto && auto.state === "off") chips.push(`<span class="chip muted"><ha-icon icon="mdi:pause-circle-outline"></ha-icon>${esc(ui.automaticOff)}</span>`);
     for (const [kind, icon] of PROTECTIONS) {
-      if (this._state(ent[`${kind}_protection`])?.state === "on") {
-        chips.push(`<span class="chip danger"><ha-icon icon="${icon}"></ha-icon>${esc(ui.protections[kind])}</span>`);
+      const guard = this._state(ent[`${kind}_protection`]);
+      if (guard?.state === "on") {
+        const value = this._value(guard.attributes?.sensor);
+        const text = value ? `${ui.protections[kind]} · ${value}` : ui.protections[kind];
+        chips.push(`<span class="chip danger"><ha-icon icon="${icon}"></ha-icon>${esc(text)}</span>`);
       }
     }
     const compass = this._config.compass === false ? "" : this._compass();
