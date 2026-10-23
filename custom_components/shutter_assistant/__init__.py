@@ -12,7 +12,7 @@ from homeassistant.helpers.typing import ConfigType
 from .const import CONF_SHOW_PANEL, DEFAULTS, DOMAIN, PLATFORMS, STORAGE_VERSION
 from .engine import ShutterConfigEntry, ShutterEngine
 from .entity import global_device_info
-from .panel import async_register_panel, async_unregister_panel
+from .panel import async_register_panel, async_set_card_resource, async_unregister_panel
 from .services import async_register_services
 from .websocket import async_register_websocket
 
@@ -64,6 +64,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ShutterConfigEntry) -> 
 async def async_remove_entry(hass: HomeAssistant, entry: ShutterConfigEntry) -> None:
     """Delete the stored state, the panel and the repair issues when the integration is removed."""
     async_unregister_panel(hass)
+    await async_set_card_resource(hass, None)
     for domain, issue_id in list(ir.async_get(hass).issues):
         if domain == DOMAIN:
             ir.async_delete_issue(hass, DOMAIN, issue_id)

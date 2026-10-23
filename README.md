@@ -6,7 +6,7 @@ Custom Integration für Home Assistant, die Rollos und Raffstores automatisch st
 
 Die Integration ersetzt typischerweise ein Bündel von YAML-Automationen mit vielen Helfern (input_boolean, input_number, timer) für Sonnenschutz, Auto-Hoch, Abendlauf, Nachziehen, Lüften, Übersteuerung und Urlaub.
 
-> Status: Version 0.6.0.
+> Status: Version 0.7.1.
 
 ## Funktionsweise
 
@@ -208,7 +208,7 @@ Ereignisse für eigene Automationen:
 
 ## Dashboard-Karte
 
-Für alle Nutzer (auch ohne Admin-Rechte) gibt es die Karte **Shutter Assistant** im Karten-Dialog: alle Fenster mit Status, Position, Fensterkontakt, nächster Aktion und laufender Übersteuerung (mit „Automatik fortsetzen“), Knöpfe für Auf, Stopp und Ab (wirken wie ein Taster, starten also eine Übersteuerung), aktiver Wetterschutz und ein kleiner Sonnenkompass. Einstellen lässt sich über die Karte nichts.
+Für alle Nutzer (auch ohne Admin-Rechte) gibt es die Karte **Shutter Assistant** im Karten-Dialog: alle Fenster mit Status, Position, Fensterkontakt, nächster Aktion und laufender Übersteuerung (mit „Automatik fortsetzen“), Knöpfe für Auf, Stopp und Ab (wirken wie ein Taster, starten also eine Übersteuerung), aktiver Wetterschutz und ein kleiner Sonnenkompass. Einstellen lässt sich über die Karte nichts. Karte und Kacheln werden automatisch geladen (bei im UI verwalteten Ressourcen auch als Dashboard-Ressource eingetragen, damit die Companion-App sie zuverlässig lädt).
 
 ```yaml
 type: custom:shutter-assistant-card
