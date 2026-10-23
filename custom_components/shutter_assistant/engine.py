@@ -137,6 +137,7 @@ from .const import (
     CONF_VENTILATION,
     CONF_VERIFY_AFTER,
     CONF_WEATHER,
+    CONF_WEATHER_PROTECTION,
     CONF_WEEKEND_DAYS,
     CONF_WIND_ENTITY,
     CONF_WIND_POSITION,
@@ -272,7 +273,8 @@ class Window:
     evening_missed: date | None = None
     tilt_sensors: list[str] = field(default_factory=list)
     window_tilted: bool = False
-    # wind or rain protection running for this window
+    # wind or rain protection running for this window (persisted, so a reload
+    # does not move covers that are already protected or were moved by hand since)
     protection: str | None = None
     # own wind threshold (None = the global one) and its protection state (persisted)
     wind_threshold: float | None = None
@@ -430,6 +432,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 morning=bool(conf[CONF_MORNING]),
                 morning_position=int(conf[CONF_MORNING_POSITION]),
                 morning_sun_position=bool(conf[CONF_MORNING_SUN_POSITION]),
+                weather_protection=bool(conf[CONF_WEATHER_PROTECTION]),
                 wind_position=_int(conf.get(CONF_WIND_POSITION)),
                 rain_position=_int(conf.get(CONF_RAIN_POSITION)),
                 frost_position=_int(conf.get(CONF_FROST_POSITION)),
@@ -437,7 +440,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             ),
             evening_settings=evening_settings,
             morning_settings=morning_settings,
-            wind_threshold=as_float(conf.get(CONF_WINDOW_WIND_THRESHOLD)),
+            wind_threshold=(
+                as_float(conf.get(CONF_WINDOW_WIND_THRESHOLD))
+                if conf[CONF_WEATHER_PROTECTION]
+                else None
+            ),
             temp_hold=Hold(float(conf[CONF_TEMP_HOLD]) * 60),
             live_hold=Hold(float(conf[CONF_SUN_HOLD]) * 60),
             no_temp=FollowUp(float(conf[CONF_MANUAL_FOLLOW_UP]) * 60),
@@ -520,6 +527,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             win.last_reason = data.get("last_reason") or {}
             win.automatic = bool(data.get("automatic", True))
             win.sun_enabled = bool(data.get("sun_enabled", True))
+            protection = data.get("protection")
+            win.protection = protection if protection in (WIND, RAIN) else None
             guard_data = data.get("wind_guard") or {}
             if win.wind_guard is not None and guard_data.get("active"):
                 win.wind_guard.active = True
@@ -557,6 +566,7 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                     "automatic": win.automatic,
                     "sun_enabled": win.sun_enabled,
                     "wind_guard": _guard_data(win.wind_guard),
+                    "protection": win.protection,
                 }
                 for wid, win in self.windows.items()
             },
@@ -1326,7 +1336,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     def protection_enabled(self, kind: str) -> bool:
         """Wind and rain need their sensor, frost a window with a frost position."""
         if kind == FROST:
-            return any(win.rules.frost_position is not None for win in self.windows.values())
+            return any(
+                win.rules.weather_protection and win.rules.frost_position is not None
+                for win in self.windows.values()
+            )
         return bool(self.opt(CONF_WIND_ENTITY if kind == WIND else CONF_RAIN_ENTITY))
 
     def _protection_values(self) -> dict[str, bool | None]:
@@ -1418,14 +1431,15 @@ class ShutterEngine(DataUpdateCoordinator[None]):
             key = f"{WIND}:{win.window_id}"
             if self._update_guard(win.wind_guard, over, ts, WIND, key, win):
                 changed = True
-        if changed:
-            self._save()
         active = self.active_protections
         for win in self.windows.values():
             own = active
             if win.wind_guard is not None:
                 own = (active - {WIND}) | ({WIND} if win.wind_guard.active else set())
-            kind = rules.protection_kind(win.rules, own)
+            # with the automatic off there is no weather protection either
+            kind = (
+                rules.protection_kind(win.rules, own) if self.automatic and win.automatic else None
+            )
             if kind == win.protection:
                 continue
             changed = True
@@ -1434,6 +1448,8 @@ class ShutterEngine(DataUpdateCoordinator[None]):
                 self._protect(win, now)
             else:
                 self._after_protection(win, now)
+        if changed:
+            self._save()
         return changed
 
     def _protect(self, win: Window, now: datetime) -> None:
@@ -1441,7 +1457,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
 
     def _after_protection(self, win: Window, now: datetime) -> None:
         """Protection ended: no old position is restored, the rules decide again."""
-        self._set_reason(win, "protection_end", None, now)
+        if self.automatic and win.automatic:
+            self._set_reason(win, "protection_end", None, now)
+        else:
+            self._set_reason(win, "protection_automatic_off", None, now)
         self._refresh(win, now)
         if self._evening(win, now):
             self._run_evening(win, now)
@@ -1717,8 +1736,11 @@ class ShutterEngine(DataUpdateCoordinator[None]):
         win = self.windows[window_id]
         setattr(win, key, on)
         self._save()
+        now = dt_util.now()
+        if key == "automatic":
+            # the weather protection follows the automatic
+            self._update_protection(now)
         if on:
-            now = dt_util.now()
             self._refresh(win, now)
             self._evaluate(win, now)
         self.async_update_listeners()
@@ -2245,8 +2267,10 @@ class ShutterEngine(DataUpdateCoordinator[None]):
     async def async_set_automatic(self, enabled: bool) -> None:
         self.automatic = enabled
         self._save()
+        now = dt_util.now()
+        # the weather protection follows the automatic
+        self._update_protection(now)
         if enabled:
-            now = dt_util.now()
             day = self._evening_day(now)
             for win in self.windows.values():
                 if win.evening_missed == day and self._evening(win, now):

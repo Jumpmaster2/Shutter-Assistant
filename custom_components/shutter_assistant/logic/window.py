@@ -81,8 +81,10 @@ class WindowRules:
     morning: bool = False
     morning_position: int = OPEN
     morning_sun_position: bool = True
-    # weather protection: target position (None = not affected), lowest
-    # position of closing movements during frost (None = off)
+    # weather protection: only with the switch of the window on; target
+    # position (None = not affected), lowest position of closing movements
+    # during frost (None = off)
+    weather_protection: bool = False
     wind_position: int | None = None
     rain_position: int | None = None
     frost_position: int | None = None
@@ -327,6 +329,8 @@ def morning(rules: WindowRules, s: Situation, manual_since_evening: bool) -> lis
 
 def protection_kind(rules: WindowRules, active: set[str] | frozenset[str]) -> str | None:
     """The running protection that applies to the window (wind before rain)."""
+    if not rules.weather_protection:
+        return None
     if WIND in active and rules.wind_position is not None:
         return WIND
     if RAIN in active and rules.rain_position is not None:
@@ -335,10 +339,10 @@ def protection_kind(rules: WindowRules, active: set[str] | frozenset[str]) -> st
 
 
 def protect(rules: WindowRules, s: Situation) -> list[Action]:
-    """Wind or rain: move to the protection position. Also during an override
-    and with the automatic off, not during the restart protection. An open
+    """Wind or rain: move to the protection position. Also during an override,
+    not with the automatic off and not during the restart protection. An open
     window only prevents closing (as everywhere)."""
-    if s.protection is None or s.startup or s.position is None:
+    if s.protection is None or not s.automatic or s.startup or s.position is None:
         return []
     wind = s.protection == WIND
     target = rules.wind_position if wind else rules.rain_position
@@ -361,7 +365,7 @@ def limit_target(
     if s.position is None or target >= s.position:
         return target
     floor = CLOSED
-    if not protective and s.frost and rules.frost_position is not None:
+    if not protective and s.frost and rules.weather_protection and rules.frost_position is not None:
         floor = max(floor, rules.frost_position)
     if not protective and s.window_tilted:
         floor = max(floor, rules.ventilation_position)

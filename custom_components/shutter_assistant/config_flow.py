@@ -126,6 +126,7 @@ from .const import (
     CONF_VENTILATION,
     CONF_VERIFY_AFTER,
     CONF_WEATHER,
+    CONF_WEATHER_PROTECTION,
     CONF_WEEKEND_DAYS,
     CONF_WIND_ENTITY,
     CONF_WIND_POSITION,
@@ -800,8 +801,9 @@ def window_ventilation_fields(values: dict[str, Any]) -> dict[Any, Any]:
 
 
 def window_protection_fields(values: dict[str, Any]) -> dict[Any, Any]:
-    """Weather protection (empty = not affected) and the lockout protection."""
+    """Weather protection (switch, positions: empty = not affected) and the lockout protection."""
     return {
+        _wreq(CONF_WEATHER_PROTECTION, values): BooleanSelector(),
         _opt(CONF_WIND_POSITION, values): _number(0, 100, 1, "%"),
         _opt(CONF_WINDOW_WIND_THRESHOLD, values): _number(0, 300, 0.5),
         _opt(CONF_RAIN_POSITION, values): _number(0, 100, 1, "%"),

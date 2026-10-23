@@ -25,8 +25,8 @@ const UI = {
       w_vent: ["Lüften & Urlaub", "Lüftungsposition beim Öffnen des Fensters und Teilnahme an der Urlaubssimulation."],
       w_morning: ["Morgenöffnung", "Nie bei Übersteuerung, Öffnungssperre oder einem seit dem Abend von Hand verstellten Rollo. Im Urlaub öffnet die Simulation."],
       w_conditions: ["Zusatzbedingungen", "Öffnungssperre (z. B. Fernseher an), Schließ-Auslöser und Fenster-Ausnahme."],
-      w_protection: ["Wetterschutz & Tür", "Positionen bei Wind und Regen, Spalt bei Frost und der Aussperrschutz einer Tür. Die Sensoren stehen unter Allgemein > Wetterschutz."],
-      protection: ["Wetterschutz", "Wind und Regen fahren die beteiligten Fenster auf ihre Schutzposition, auch bei Übersteuerung. Frost lässt beim Schließen einen Spalt. Die Positionen stehen am Fenster."],
+      w_protection: ["Wetterschutz & Tür", "Wetterschutz für dieses Fenster ein/aus, Positionen bei Wind und Regen, Spalt bei Frost und der Aussperrschutz einer Tür. Die Sensoren stehen unter Allgemein > Wetterschutz."],
+      protection: ["Wetterschutz", "Wind und Regen fahren nur die Fenster mit eingeschaltetem Wetterschutz auf ihre Schutzposition, auch bei Übersteuerung, nicht bei ausgeschalteter Automatik. Frost lässt beim Schließen einen Spalt. Die Positionen stehen am Fenster."],
       g_basics: ["Gruppe", "Eine Himmelsrichtung. Die Schwellen stehen am Fenster."],
       g_sensors: ["Sonnensensoren", "Jeder Sensor der Gruppe muss die Schwelle des Fensters erreichen."],
       compass: ["Sonnenkompass", "Aktueller Sonnenstand und die Bereiche der Gruppen."],
@@ -182,8 +182,8 @@ const UI = {
       w_vent: ["Ventilation & vacation", "Ventilation position when the window opens and taking part in the vacation simulation."],
       w_morning: ["Morning opening", "Never with an active override, an opening block or a cover moved by hand since the evening. During vacation the simulation opens instead."],
       w_conditions: ["Additional conditions", "Opening block (e.g. TV on), close trigger and window exception."],
-      w_protection: ["Weather protection & door", "Positions with wind and rain, a gap with frost and the lockout protection of a door. The sensors are under General > Weather protection."],
-      protection: ["Weather protection", "Wind and rain move the windows that take part to their protection position, also during an override. Frost keeps a gap when closing. The positions are set per window."],
+      w_protection: ["Weather protection & door", "Weather protection for this window on/off, positions with wind and rain, a gap with frost and the lockout protection of a door. The sensors are under General > Weather protection."],
+      protection: ["Weather protection", "Wind and rain move only the windows with the weather protection on to their protection position, also during an override, not with the automatic off. Frost keeps a gap when closing. The positions are set per window."],
       g_basics: ["Group", "A direction of the sun. Thresholds are set per window."],
       g_sensors: ["Sun sensors", "Every sensor of the group must reach the threshold of the window."],
       compass: ["Sun compass", "Current position of the sun and the sectors of the groups."],
@@ -425,13 +425,21 @@ const WINDOW_CARDS = [
     ],
   },
 ];
-WINDOW_CARDS.push({ id: "w_protection", icon: "mdi:weather-windy", fields: () => ["wind_position", "window_wind_threshold", "rain_position", "frost_position", "lockout_protection"] });
+WINDOW_CARDS.push({
+  id: "w_protection",
+  icon: "mdi:weather-windy",
+  // the positions keep their values while the weather protection is off
+  fields: (d) =>
+    d.weather_protection
+      ? ["weather_protection", "wind_position", "window_wind_threshold", "rain_position", "frost_position", "lockout_protection"]
+      : ["weather_protection", "lockout_protection"],
+});
 const GROUP_CARDS = [
   { id: "g_basics", icon: "mdi:compass-outline", fields: () => ["name", "wall", "azimuth_from", "azimuth_to"] },
   { id: "g_sensors", icon: "mdi:weather-sunny", fields: () => ["radiation_sensors", "pv_sensors", "lux_sensors"] },
 ];
 // changing one of these shows or hides other fields
-const REDRAW_KEYS = new Set(["group", "wall", "evening_custom", "morning_enabled", "morning_mode"]);
+const REDRAW_KEYS = new Set(["group", "wall", "evening_custom", "morning_enabled", "morning_mode", "weather_protection"]);
 // walls of the house by their angle to the front (right and left seen from inside)
 const WALLS = [
   ["front", 0],

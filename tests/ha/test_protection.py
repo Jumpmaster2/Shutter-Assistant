@@ -14,6 +14,8 @@ TILT = "binary_sensor.living_room_tilted"
 STATUS = "sensor.living_room_status"
 OVERRIDE = "binary_sensor.living_room_manual_override"
 WIND_ON = "binary_sensor.shutter_assistant_wind_protection"
+AUTOMATIC = "switch.shutter_assistant_automatic"
+WINDOW_AUTOMATIC = "switch.living_room_automatic"
 
 
 def positions(calls) -> list[int]:
@@ -28,7 +30,11 @@ async def test_wind_moves_also_during_an_override_and_releases_later(
     set_cover(hass, 40)
     await setup_entry(
         hass,
-        make_entry(window={"wind_position": 100}, wind_entity=WIND, protection_release=15),
+        make_entry(
+            window={"weather_protection": True, "wind_position": 100},
+            wind_entity=WIND,
+            protection_release=15,
+        ),
     )
     events = []
     hass.bus.async_listen("shutter_assistant_protection", events.append)
@@ -72,12 +78,13 @@ async def test_own_wind_threshold_per_window(
             "name": "Balcony",
             "cover": second,
             "window_sensors": [],
+            "weather_protection": True,
             "wind_position": 20,
             "window_wind_threshold": 50,
         }
     }
     entry = make_entry(
-        window={"wind_position": 20},
+        window={"weather_protection": True, "wind_position": 20},
         extra_windows=balcony,
         wind_entity=WIND,
         wind_threshold=75,
@@ -141,13 +148,110 @@ async def test_windows_without_a_position_are_not_affected(
     assert hass.states.get(STATUS).state != "protection"
 
 
+async def test_positions_without_the_switch_of_the_window_do_nothing(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-10-15 12:00:00+02:00")
+    hass.states.async_set(WIND, "10")
+    set_cover(hass, 40)
+    await setup_entry(
+        hass,
+        make_entry(window={"wind_position": 100, "window_wind_threshold": 20}, wind_entity=WIND),
+    )
+    hass.states.async_set(WIND, "90")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 30, step=1)
+    assert calls["open_cover"] == [] and positions(calls) == []
+    assert hass.states.get(STATUS).state != "protection"
+
+
+async def test_no_weather_protection_with_the_automatic_off(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-10-15 12:00:00+02:00")
+    hass.states.async_set(WIND, "10")
+    set_cover(hass, 40)
+    await setup_entry(
+        hass,
+        make_entry(window={"weather_protection": True, "wind_position": 100}, wind_entity=WIND),
+    )
+    await hass.services.async_call("switch", "turn_off", {"entity_id": AUTOMATIC}, blocking=True)
+    hass.states.async_set(WIND, "90")
+    await hass.async_block_till_done()
+    assert calls["open_cover"] == []
+    assert hass.states.get(STATUS).state == "off"
+    # automatic on again: the running protection applies
+    await hass.services.async_call("switch", "turn_on", {"entity_id": AUTOMATIC}, blocking=True)
+    assert len(calls["open_cover"]) == 1
+    assert hass.states.get(STATUS).state == "protection"
+    # the automatic of the window off ends it for this window, nothing moves
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": WINDOW_AUTOMATIC}, blocking=True
+    )
+    assert hass.states.get(STATUS).state == "off"
+    assert len(calls["open_cover"]) == 1 and positions(calls) == []
+    reason = hass.states.get("sensor.living_room_last_reason")
+    assert reason.attributes["code"] == "protection_automatic_off"
+
+
+async def test_saving_settings_does_not_move_protected_covers_again(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    second = "cover.balcony"
+    freezer.move_to("2026-10-15 12:00:00+02:00")
+    hass.states.async_set(WIND, "10")
+    hass.states.async_set(second, "open", {"current_position": 100, "supported_features": 15})
+    set_cover(hass, 100)
+    balcony = {
+        "window_balcony": {
+            "name": "Balcony",
+            "cover": second,
+            "window_sensors": [],
+            "weather_protection": True,
+            "wind_position": 20,
+            "window_wind_threshold": 50,
+        }
+    }
+    entry = make_entry(
+        window={"weather_protection": True, "wind_position": 20},
+        extra_windows=balcony,
+        wind_entity=WIND,
+        wind_threshold=75,
+    )
+    await setup_entry(hass, entry)
+    hass.states.async_set(WIND, "80")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 30, step=1)
+    assert len(calls["set_cover_position"]) == 2
+    # moved up by hand during the protection
+    set_cover(hass, 100)
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 30, step=1)
+
+    # own wind threshold of the balcony changed: reload, nothing moves again
+    sub = entry.subentries["window_balcony"]
+    hass.config_entries.async_update_subentry(
+        entry, sub, data={**sub.data, "window_wind_threshold": 60}
+    )
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 30, step=1)
+    # global threshold changed: reload, nothing moves again either
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "wind_threshold": 70})
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 30, step=1)
+    assert len(calls["set_cover_position"]) == 2
+    assert hass.states.get(STATUS).state == "protection"
+
+
 async def test_rain_closes_after_the_window_was_closed(
     hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to("2026-10-15 12:00:00+02:00")
     hass.states.async_set(RAIN, "off")
     hass.states.async_set(CONTACT, "on")
-    await setup_entry(hass, make_entry(window={"rain_position": 0}, rain_entity=RAIN))
+    await setup_entry(
+        hass, make_entry(window={"weather_protection": True, "rain_position": 0}, rain_entity=RAIN)
+    )
     hass.states.async_set(RAIN, "on")
     await hass.async_block_till_done()
     assert calls["close_cover"] == []
@@ -162,7 +266,7 @@ async def test_frost_keeps_a_gap_in_the_evening(
 ) -> None:
     freezer.move_to("2026-12-15 16:50:00+01:00")
     hass.states.async_set(OUTDOOR, "-3.0")
-    await setup_entry(hass, make_entry(window={"frost_position": 5}))
+    await setup_entry(hass, make_entry(window={"weather_protection": True, "frost_position": 5}))
     assert hass.states.get("binary_sensor.shutter_assistant_frost_protection").state == "on"
     await advance(hass, freezer, 15 * 60)
     assert calls["close_cover"] == []

@@ -389,6 +389,10 @@ export const LABELS = {
    "Wetter-Entität",
    "Ihre Tagesvorhersage entscheidet beim Tageswechsel, ob heute ein Sommertag ist."
   ],
+  "weather_protection": [
+   "Wetterschutz für dieses Fenster",
+   "Aus = Wind, Regen und Frost fahren oder begrenzen dieses Rollo nie, egal was unten eingetragen ist. Für jedes Fenster einschalten, das mitmachen soll. Mit ausgeschalteter Automatik (global oder für dieses Fenster) gibt es auch keinen Wetterschutz."
+  ],
   "weekend_days": [
    "Wochenendtage",
    "Nur ohne Werktag-Sensor: an diesen Tagen gilt die Wochenend-Uhrzeit der Morgenöffnung."
@@ -399,7 +403,7 @@ export const LABELS = {
   ],
   "wind_position": [
    "Position bei Wind",
-   "Leer = nicht betroffen. Z. B. 100 % fährt Raffstores hoch."
+   "Leer = nicht betroffen. Z. B. 100 % fährt Raffstores hoch. Nur mit eingeschaltetem Wetterschutz des Fensters."
   ],
   "wind_threshold": [
    "Windschutz ab",
@@ -815,6 +819,10 @@ export const LABELS = {
    "Weather entity",
    "Its daily forecast decides at the day change whether today is a summer day."
   ],
+  "weather_protection": [
+   "Weather protection for this window",
+   "Off = wind, rain and frost never move or limit this cover, whatever the positions below say. Turn it on for every window that should take part. With the automatic off (globally or for this window) there is no weather protection either."
+  ],
   "weekend_days": [
    "Weekend days",
    "Only without a workday sensor: on these days the weekend time of the morning opening applies."
@@ -825,7 +833,7 @@ export const LABELS = {
   ],
   "wind_position": [
    "Position with wind",
-   "Empty = not affected. E.g. 100 % retracts external venetian blinds."
+   "Empty = not affected. E.g. 100 % retracts external venetian blinds. Only with the weather protection of the window on."
   ],
   "wind_threshold": [
    "Wind protection from",
