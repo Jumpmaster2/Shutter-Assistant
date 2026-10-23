@@ -456,6 +456,7 @@
                 "window_wind_threshold": "Eigene Windschwelle",
                 "rain_position": "Position bei Regen",
                 "frost_position": "Tiefste Position bei Frost",
+                "protection_keep_closed": "Weiter geschlossen gilt als geschützt",
                 "lockout_protection": "Aussperrschutz (Tür)"
               },
               "data_description": {
@@ -464,6 +465,7 @@
                 "window_wind_threshold": "Leer = Windschutz ab der Schwelle der Grundeinstellungen. Sonst schützt dieses Fenster schon oder erst ab diesem Wert (Einheit des Windsensors).",
                 "rain_position": "Leer = nicht betroffen. Z. B. 0 % für ein Dachfenster.",
                 "frost_position": "Leer = aus. Bei Frost stoppt das Schließen hier, damit das Rollo nicht anfriert, z. B. 5 %.",
+                "protection_keep_closed": "Ein Rollo, das schon weiter zu ist als seine Position bei Wind oder Regen, wird nicht dorthin hochgefahren (z. B. zu auf 0 % bei Wind-Position 20 %). Nicht bei 100 %: Raffstores einfahren läuft immer.",
                 "lockout_protection": "Solange der Kontakt offen meldet, fährt nichts unter die Lüftungsposition, auch nicht mit Fenster-Ausnahme oder Wetterschutz."
               }
             }

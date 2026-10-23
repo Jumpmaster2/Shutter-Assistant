@@ -431,7 +431,7 @@ WINDOW_CARDS.push({
   // the positions keep their values while the weather protection is off
   fields: (d) =>
     d.weather_protection
-      ? ["weather_protection", "wind_position", "window_wind_threshold", "rain_position", "frost_position", "lockout_protection"]
+      ? ["weather_protection", "wind_position", "window_wind_threshold", "rain_position", "frost_position", "protection_keep_closed", "lockout_protection"]
       : ["weather_protection", "lockout_protection"],
 });
 const GROUP_CARDS = [

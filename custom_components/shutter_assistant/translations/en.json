@@ -456,6 +456,7 @@
                 "window_wind_threshold": "Own wind threshold",
                 "rain_position": "Position with rain",
                 "frost_position": "Lowest position with frost",
+                "protection_keep_closed": "Further closed counts as protected",
                 "lockout_protection": "Lockout protection (door)"
               },
               "data_description": {
@@ -464,6 +465,7 @@
                 "window_wind_threshold": "Empty = wind protection from the threshold of the basic settings. Otherwise this window is protected already or only from this value (unit of the wind sensor).",
                 "rain_position": "Empty = not affected. E.g. 0 % for a roof window shutter.",
                 "frost_position": "Empty = off. With frost, closing stops at this position so the cover cannot freeze on, e.g. 5 %.",
+                "protection_keep_closed": "A cover already further closed than its position with wind or rain is not opened to it (e.g. closed at 0 % with a wind position of 20 %). Not for a position of 100 %: retracting external venetian blinds always runs.",
                 "lockout_protection": "While the contact reports open, nothing closes below the ventilation position, also not with the window exception or the weather protection."
               }
             }

@@ -172,6 +172,8 @@ CONF_LOCKOUT = "lockout_protection"
 # Weather protection per window: only with this switch on, then the positions
 # (empty = not affected / off).
 CONF_WEATHER_PROTECTION = "weather_protection"
+# a cover already further closed than its protection position counts as protected
+CONF_PROTECTION_KEEP_CLOSED = "protection_keep_closed"
 CONF_WIND_POSITION = "wind_position"
 # own wind threshold of the window (empty = the global threshold)
 CONF_WINDOW_WIND_THRESHOLD = "window_wind_threshold"
@@ -256,6 +258,7 @@ WINDOW_DEFAULTS: Final[dict[str, object]] = {
     CONF_TILT_SENSORS: [],
     CONF_LOCKOUT: False,
     CONF_WEATHER_PROTECTION: False,
+    CONF_PROTECTION_KEEP_CLOSED: True,
     CONF_PV_THRESHOLD: 130.0,
     CONF_LUX_THRESHOLD: 14500.0,
     CONF_RADIATION_THRESHOLD: 150.0,
