@@ -88,6 +88,7 @@ from .const import (
     CONF_OVERRIDE_IGNORE_EVENING,
     CONF_OVERRIDE_SUNRISE,
     CONF_OVERRIDE_TRIGGER,
+    CONF_PROTECTION_KEEP_CLOSED,
     CONF_PROTECTION_RELEASE,
     CONF_PV_SENSORS,
     CONF_RADIATION_SENSORS,
@@ -808,6 +809,7 @@ def window_protection_fields(values: dict[str, Any]) -> dict[Any, Any]:
         _opt(CONF_WINDOW_WIND_THRESHOLD, values): _number(0, 300, 0.5),
         _opt(CONF_RAIN_POSITION, values): _number(0, 100, 1, "%"),
         _opt(CONF_FROST_POSITION, values): _number(0, 100, 1, "%"),
+        _wreq(CONF_PROTECTION_KEEP_CLOSED, values): BooleanSelector(),
         _wreq(CONF_LOCKOUT, values): BooleanSelector(),
     }
 

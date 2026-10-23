@@ -10,9 +10,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
+from .const import CONF_RAIN_ENTITY, CONF_WIND_ENTITY
 from .engine import ShutterConfigEntry, ShutterEngine
 from .entity import GlobalEntity, WindowEntity
-from .logic.protection import KINDS, WIND
+from .logic.protection import KINDS, RAIN, WIND
 
 PARALLEL_UPDATES = 0
 
@@ -100,6 +101,11 @@ class WeatherProtection(GlobalEntity, BinarySensorEntity):
             if due is not None
             else None
         }
+        # the sensor whose current value the overview shows next to the protection
+        if self.kind in (WIND, RAIN):
+            attrs["sensor"] = engine.opt(
+                CONF_WIND_ENTITY if self.kind == WIND else CONF_RAIN_ENTITY
+            )
         if self.kind == WIND:
             attrs["windows"] = sorted(
                 win.name for win in engine.windows.values() if win.protection == WIND

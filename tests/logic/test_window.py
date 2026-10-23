@@ -338,6 +338,19 @@ def test_protect_also_with_override_not_with_automatic_off() -> None:
     assert w.protect(rules, replace(s, protection=None)) == []
 
 
+def test_protect_does_not_open_a_cover_already_further_closed() -> None:
+    rules = replace(WEATHER, wind_position=20)
+    s = Situation(position=0, protection="wind")
+    assert w.protect(rules, s) == []
+    assert kinds(w.protect(rules, replace(s, position=60))) == [(w.POSITION, w.R_PROTECT_WIND, 20)]
+    # option off: opens to the protection position
+    off = replace(rules, protection_keep_closed=False)
+    assert kinds(w.protect(off, s)) == [(w.POSITION, w.R_PROTECT_WIND, 20)]
+    # 100 %: retracting external venetian blinds always runs
+    blinds = replace(WEATHER, wind_position=100)
+    assert kinds(w.protect(blinds, s)) == [(w.POSITION, w.R_PROTECT_WIND, 100)]
+
+
 def test_protect_rain_does_not_close_an_open_window() -> None:
     rules = replace(WEATHER, rain_position=0)
     s = Situation(position=100, protection="rain")

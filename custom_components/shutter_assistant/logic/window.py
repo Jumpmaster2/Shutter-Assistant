@@ -85,6 +85,9 @@ class WindowRules:
     # position (None = not affected), lowest position of closing movements
     # during frost (None = off)
     weather_protection: bool = False
+    # a cover already further closed than the protection position is not opened
+    # to it (not for 100 %: retracting external venetian blinds)
+    protection_keep_closed: bool = True
     wind_position: int | None = None
     rain_position: int | None = None
     frost_position: int | None = None
@@ -341,12 +344,15 @@ def protection_kind(rules: WindowRules, active: set[str] | frozenset[str]) -> st
 def protect(rules: WindowRules, s: Situation) -> list[Action]:
     """Wind or rain: move to the protection position. Also during an override,
     not with the automatic off and not during the restart protection. An open
-    window only prevents closing (as everywhere)."""
+    window only prevents closing (as everywhere). A cover already further
+    closed counts as protected (option, not for a protection position of 100 %)."""
     if s.protection is None or not s.automatic or s.startup or s.position is None:
         return []
     wind = s.protection == WIND
     target = rules.wind_position if wind else rules.rain_position
     if target is None or target == s.position:
+        return []
+    if rules.protection_keep_closed and s.position < target < OPEN:
         return []
     if target < s.position and s.window_blocks:
         return []

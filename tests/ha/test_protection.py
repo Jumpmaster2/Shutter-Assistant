@@ -104,6 +104,7 @@ async def test_own_wind_threshold_per_window(
     assert moved() == [(second, 20)]
     assert hass.states.get(WIND_ON).state == "on"
     assert hass.states.get(WIND_ON).attributes["windows"] == ["Balcony"]
+    assert hass.states.get(WIND_ON).attributes["sensor"] == WIND
     assert events[-1].data == {
         "kind": "wind",
         "active": True,
@@ -240,6 +241,29 @@ async def test_saving_settings_does_not_move_protected_covers_again(
     await hass.async_block_till_done()
     await advance(hass, freezer, 30, step=1)
     assert len(calls["set_cover_position"]) == 2
+    assert hass.states.get(STATUS).state == "protection"
+
+
+async def test_closing_the_door_does_not_open_a_cover_further_closed(
+    hass: HomeAssistant, base_states, calls, freezer: FrozenDateTimeFactory
+) -> None:
+    freezer.move_to("2026-10-15 12:00:00+02:00")
+    hass.states.async_set(WIND, "10")
+    hass.states.async_set(CONTACT, "on")
+    set_cover(hass, 0)
+    await setup_entry(
+        hass,
+        make_entry(
+            window={"weather_protection": True, "wind_position": 20, "ventilation": False},
+            wind_entity=WIND,
+        ),
+    )
+    hass.states.async_set(WIND, "90")
+    await hass.async_block_till_done()
+    hass.states.async_set(CONTACT, "off")
+    await hass.async_block_till_done()
+    await advance(hass, freezer, 30, step=1)
+    assert positions(calls) == [] and calls["open_cover"] == []
     assert hass.states.get(STATUS).state == "protection"
 
 

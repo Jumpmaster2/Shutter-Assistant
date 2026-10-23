@@ -257,6 +257,10 @@ export const LABELS = {
    "Toleranz für Auto-Hoch",
    "Auto-Hoch öffnet nur Rollos, die auf der Sonnenschutz-Position bis so viel darüber stehen. Von Hand anders gestellte Rollos bleiben."
   ],
+  "protection_keep_closed": [
+   "Weiter geschlossen gilt als geschützt",
+   "Ein Rollo, das schon weiter zu ist als seine Position bei Wind oder Regen, wird nicht dorthin hochgefahren (z. B. zu auf 0 % bei Wind-Position 20 %). Nicht bei 100 %: Raffstores einfahren läuft immer."
+  ],
   "protection_release": [
    "Freigabe nach",
    "Ein Schutz endet erst, wenn der Wert so lange wieder im sicheren Bereich war. Ein nicht verfügbarer Sensor beendet nie einen Schutz."
@@ -686,6 +690,10 @@ export const LABELS = {
   "position_tolerance": [
    "Tolerance for auto up",
    "Auto up only opens covers standing at the sun protection position up to this much above it. Covers moved elsewhere by hand stay."
+  ],
+  "protection_keep_closed": [
+   "Further closed counts as protected",
+   "A cover already further closed than its position with wind or rain is not opened to it (e.g. closed at 0 % with a wind position of 20 %). Not for a position of 100 %: retracting external venetian blinds always runs."
   ],
   "protection_release": [
    "Release after",

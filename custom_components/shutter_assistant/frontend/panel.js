@@ -431,7 +431,7 @@ WINDOW_CARDS.push({
   // the positions keep their values while the weather protection is off
   fields: (d) =>
     d.weather_protection
-      ? ["weather_protection", "wind_position", "window_wind_threshold", "rain_position", "frost_position", "lockout_protection"]
+      ? ["weather_protection", "wind_position", "window_wind_threshold", "rain_position", "frost_position", "protection_keep_closed", "lockout_protection"]
       : ["weather_protection", "lockout_protection"],
 });
 const GROUP_CARDS = [
@@ -778,7 +778,7 @@ class ShutterAssistantPanel extends HTMLElement {
 
   _liveIds() {
     const cfg = this._cfg;
-    const ids = [...Object.values(cfg.entities || {}), "sun.sun", cfg.options.outdoor_temperature, ...(cfg.options.vacation_entities || [])];
+    const ids = [...Object.values(cfg.entities || {}), "sun.sun", cfg.options.outdoor_temperature, cfg.options.wind_entity, cfg.options.rain_entity, ...(cfg.options.vacation_entities || [])];
     for (const win of this._windows) {
       ids.push(...Object.values(win.entities || {}), win.data.cover, ...(win.data.window_sensors || []), ...(win.data.tilt_sensors || []));
     }
@@ -930,7 +930,10 @@ class ShutterAssistantPanel extends HTMLElement {
       if (!guard) continue;
       const active = guard.state === "on";
       const release = guard.attributes?.release_at;
-      facts.push([icon, ui.protections[kind], active ? (release ? ui.until(this._time(release)) : ui.on) : ui.off, active ? "danger" : ""]);
+      // while it runs: the current value of the sensor that triggered it
+      const value = active ? this._numericValue(guard.attributes?.sensor) : "";
+      const text = active ? [value, release ? ui.until(this._time(release)) : value ? "" : ui.on].filter(Boolean).join(" · ") : ui.off;
+      facts.push([icon, ui.protections[kind], text, active ? "danger" : ""]);
     }
     const restart = auto?.attributes?.restart_protection_until;
     if (restart) facts.push(["mdi:restart", ui.restart, ui.until(this._time(restart)), "muted"]);
@@ -1290,6 +1293,12 @@ class ShutterAssistantPanel extends HTMLElement {
   }
 
   // ------------------------------------------------------------------ groups tab
+
+  _numericValue(id) {
+    const st = this._state(id);
+    if (!st || INVALID.includes(st.state) || this._num(st.state) === "") return "";
+    return `${this._num(st.state, 1)} ${st.attributes.unit_of_measurement || ""}`.trim();
+  }
 
   _sensorValue(id) {
     const st = this._state(id);
