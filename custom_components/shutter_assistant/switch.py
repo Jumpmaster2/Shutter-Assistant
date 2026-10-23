@@ -61,7 +61,7 @@ class AutomaticSwitch(GlobalEntity, SwitchEntity):
 class WindowSwitch(WindowEntity, SwitchEntity):
     """Automatic (off = like the main switch, but for this window) or sun protection
     (off = not lowered for the sun; opens again if it was lowered) of one window.
-    The weather protection keeps working."""
+    The automatic off also ends the weather protection of the window."""
 
     def __init__(self, engine: ShutterEngine, window_id: str, key: str, attribute: str) -> None:
         super().__init__(engine, window_id, key)

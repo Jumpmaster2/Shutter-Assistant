@@ -311,26 +311,35 @@ def test_no_notification_for_an_unavailable_contact() -> None:
 # ---------------------------------------------------------------- weather protection
 
 
+WEATHER = replace(RULES, weather_protection=True)
+
+
 def test_protection_kind_wind_before_rain() -> None:
-    rules = replace(RULES, wind_position=100, rain_position=0)
+    rules = replace(WEATHER, wind_position=100, rain_position=0)
     assert w.protection_kind(rules, {"wind", "rain"}) == "wind"
     assert w.protection_kind(rules, {"rain"}) == "rain"
     # a window without a position is not affected
-    assert w.protection_kind(RULES, {"wind", "rain"}) is None
-    assert w.protection_kind(replace(RULES, rain_position=0), {"wind", "rain"}) == "rain"
+    assert w.protection_kind(WEATHER, {"wind", "rain"}) is None
+    assert w.protection_kind(replace(WEATHER, rain_position=0), {"wind", "rain"}) == "rain"
 
 
-def test_protect_also_with_override_and_automatic_off() -> None:
-    rules = replace(RULES, wind_position=100)
-    s = Situation(position=10, protection="wind", override=True, automatic=False)
+def test_protection_kind_needs_the_switch_of_the_window() -> None:
+    rules = replace(RULES, wind_position=100, rain_position=0)
+    assert w.protection_kind(rules, {"wind", "rain"}) is None
+
+
+def test_protect_also_with_override_not_with_automatic_off() -> None:
+    rules = replace(WEATHER, wind_position=100)
+    s = Situation(position=10, protection="wind", override=True)
     assert kinds(w.protect(rules, s)) == [(w.POSITION, w.R_PROTECT_WIND, 100)]
+    assert w.protect(rules, replace(s, automatic=False)) == []
     assert w.protect(rules, replace(s, position=100)) == []
     assert w.protect(rules, replace(s, startup=True)) == []
     assert w.protect(rules, replace(s, protection=None)) == []
 
 
 def test_protect_rain_does_not_close_an_open_window() -> None:
-    rules = replace(RULES, rain_position=0)
+    rules = replace(WEATHER, rain_position=0)
     s = Situation(position=100, protection="rain")
     assert kinds(w.protect(rules, s)) == [(w.POSITION, w.R_PROTECT_RAIN, 0)]
     assert w.protect(rules, replace(s, window_open=True)) == []
@@ -355,9 +364,11 @@ def test_sun_switch_off_does_not_lower_but_opens_again() -> None:
 
 
 def test_frost_keeps_a_gap_except_for_protection() -> None:
-    rules = replace(RULES, frost_position=5)
+    rules = replace(WEATHER, frost_position=5)
     s = Situation(position=100, frost=True)
     assert w.limit_target(rules, s, 0) == 5
+    # only with the weather protection of the window on
+    assert w.limit_target(replace(rules, weather_protection=False), s, 0) == 0
     assert w.limit_target(rules, s, 0, protective=True) == 0
     assert w.limit_target(rules, replace(s, frost=False), 0) == 0
     assert w.limit_target(RULES, s, 0) == 0

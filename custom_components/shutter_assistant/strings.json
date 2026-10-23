@@ -451,6 +451,7 @@
             "protection": {
               "name": "Weather protection & door",
               "data": {
+                "weather_protection": "Weather protection for this window",
                 "wind_position": "Position with wind",
                 "window_wind_threshold": "Own wind threshold",
                 "rain_position": "Position with rain",
@@ -458,7 +459,8 @@
                 "lockout_protection": "Lockout protection (door)"
               },
               "data_description": {
-                "wind_position": "Empty = not affected. E.g. 100 % retracts external venetian blinds.",
+                "weather_protection": "Off = wind, rain and frost never move or limit this cover, whatever the positions below say. Turn it on for every window that should take part. With the automatic off (globally or for this window) there is no weather protection either.",
+                "wind_position": "Empty = not affected. E.g. 100 % retracts external venetian blinds. Only with the weather protection of the window on.",
                 "window_wind_threshold": "Empty = wind protection from the threshold of the basic settings. Otherwise this window is protected already or only from this value (unit of the wind sensor).",
                 "rain_position": "Empty = not affected. E.g. 0 % for a roof window shutter.",
                 "frost_position": "Empty = off. With frost, closing stops at this position so the cover cannot freeze on, e.g. 5 %.",

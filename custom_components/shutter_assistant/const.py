@@ -169,7 +169,9 @@ CONF_GROUP = "group"
 # as window contacts) and the lockout protection of doors.
 CONF_TILT_SENSORS = "tilt_sensors"
 CONF_LOCKOUT = "lockout_protection"
-# Weather protection per window (empty = not affected / off).
+# Weather protection per window: only with this switch on, then the positions
+# (empty = not affected / off).
+CONF_WEATHER_PROTECTION = "weather_protection"
 CONF_WIND_POSITION = "wind_position"
 # own wind threshold of the window (empty = the global threshold)
 CONF_WINDOW_WIND_THRESHOLD = "window_wind_threshold"
@@ -253,6 +255,7 @@ WINDOW_DEFAULTS: Final[dict[str, object]] = {
     CONF_WINDOW_SENSORS: [],
     CONF_TILT_SENSORS: [],
     CONF_LOCKOUT: False,
+    CONF_WEATHER_PROTECTION: False,
     CONF_PV_THRESHOLD: 130.0,
     CONF_LUX_THRESHOLD: 14500.0,
     CONF_RADIATION_THRESHOLD: 150.0,

@@ -97,6 +97,10 @@ _TEXTS: dict[str, dict[str, str]] = {
         "de": "Wetterschutz beendet: Automatik wieder aktiv",
         "en": "Weather protection ended: automatic active again",
     },
+    "protection_automatic_off": {
+        "de": "Wetterschutz beendet: Automatik aus",
+        "en": "Weather protection ended: automatic off",
+    },
     "kind_wind": {"de": "Windschutz", "en": "Wind protection"},
     "kind_rain": {"de": "Regenschutz", "en": "Rain protection"},
     "kind_frost": {"de": "Frostschutz", "en": "Frost protection"},

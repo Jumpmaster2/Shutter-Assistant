@@ -451,6 +451,7 @@
             "protection": {
               "name": "Wetterschutz & Tür",
               "data": {
+                "weather_protection": "Wetterschutz für dieses Fenster",
                 "wind_position": "Position bei Wind",
                 "window_wind_threshold": "Eigene Windschwelle",
                 "rain_position": "Position bei Regen",
@@ -458,7 +459,8 @@
                 "lockout_protection": "Aussperrschutz (Tür)"
               },
               "data_description": {
-                "wind_position": "Leer = nicht betroffen. Z. B. 100 % fährt Raffstores hoch.",
+                "weather_protection": "Aus = Wind, Regen und Frost fahren oder begrenzen dieses Rollo nie, egal was unten eingetragen ist. Für jedes Fenster einschalten, das mitmachen soll. Mit ausgeschalteter Automatik (global oder für dieses Fenster) gibt es auch keinen Wetterschutz.",
+                "wind_position": "Leer = nicht betroffen. Z. B. 100 % fährt Raffstores hoch. Nur mit eingeschaltetem Wetterschutz des Fensters.",
                 "window_wind_threshold": "Leer = Windschutz ab der Schwelle der Grundeinstellungen. Sonst schützt dieses Fenster schon oder erst ab diesem Wert (Einheit des Windsensors).",
                 "rain_position": "Leer = nicht betroffen. Z. B. 0 % für ein Dachfenster.",
                 "frost_position": "Leer = aus. Bei Frost stoppt das Schließen hier, damit das Rollo nicht anfriert, z. B. 5 %.",
