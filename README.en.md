@@ -6,7 +6,7 @@ Custom integration for Home Assistant that controls roller shutters and blinds a
 
 It typically replaces a bundle of YAML automations with many helpers (input_boolean, input_number, timer) for sun protection, auto up, evening run, closing after the window was closed, ventilation, override and vacation.
 
-> Status: version 0.6.0.
+> Status: version 0.7.1.
 
 ## How it works
 
@@ -208,7 +208,7 @@ Events for own automations:
 
 ## Dashboard card
 
-For every user (also without admin rights) there is the card **Shutter Assistant** in the card dialog: all windows with status, position, window contact, next action and a running override (with "Resume automatic"), buttons to open, stop and close (they act like a button on the wall, so they start an override), active weather protection and a small sun compass. Nothing can be set up from the card.
+For every user (also without admin rights) there is the card **Shutter Assistant** in the card dialog: all windows with status, position, window contact, next action and a running override (with "Resume automatic"), buttons to open, stop and close (they act like a button on the wall, so they start an override), active weather protection and a small sun compass. Nothing can be set up from the card. The card and the tiles are loaded automatically (with resources managed in the UI they are also added as a dashboard resource, so the companion app loads them reliably).
 
 ```yaml
 type: custom:shutter-assistant-card
